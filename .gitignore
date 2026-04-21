@@ -1,0 +1,4 @@
+settings.json
+*.qmlc
+*.jsc
+.qmlls.ini

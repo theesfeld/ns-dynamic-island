@@ -1,0 +1,47 @@
+{
+  "id": "ns-dynamic-island",
+  "name": "Dynamic Island",
+  "version": "0.1.0",
+  "minNoctaliaVersion": "4.6.6",
+  "author": "William Theesfeld",
+  "license": "MIT",
+  "repository": "https://github.com/theesfeld/ns-dynamic-island",
+  "description": "A floating, morphing top-of-screen island that reacts to media, notifications, and screen recording.",
+  "tags": [
+    "Overlay",
+    "Media",
+    "Notifications"
+  ],
+  "entryPoints": {
+    "main": "Main.qml",
+    "settings": "Settings.qml"
+  },
+  "dependencies": {
+    "plugins": []
+  },
+  "metadata": {
+    "defaultSettings": {
+      "enabled": true,
+      "position": "top",
+      "marginPx": 6,
+      "horizontalOffset": 0,
+      "compactWidth": 180,
+      "expandedWidth": 440,
+      "height": 36,
+      "cornerRadius": 18,
+      "hideDelaySec": 4,
+      "hoverToExpand": true,
+      "autoShowOnMedia": true,
+      "autoShowOnNotification": true,
+      "notificationDurationSec": 5,
+      "detectScreenRecording": true,
+      "recordingPollSec": 3,
+      "idleShowClock": true,
+      "idleShowWeather": false,
+      "weatherLocation": "",
+      "weatherUnits": "metric",
+      "dualBubble": true,
+      "disabledScreens": []
+    }
+  }
+}
