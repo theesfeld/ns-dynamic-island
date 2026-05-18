@@ -392,6 +392,21 @@ Item {
 
   Component.onCompleted: {
     if (root.weatherCacheEnabled) weatherCacheLoad.running = true
+
+    // Roll-over pomodoro stats if it's a new day
+    if (root.pomodoroStatsEnabled) {
+      const today = root._todayString()
+      const savedDate = root.cfg.pomodoroStatsDate || ""
+      if (savedDate === today) {
+        root.pomodoroTodayCycles = root.cfg.pomodoroTodayCycles || 0
+        root.pomodoroTodayFocusMin = root.cfg.pomodoroTodayFocusMin || 0
+      } else {
+        root.pomodoroTodayCycles = 0
+        root.pomodoroTodayFocusMin = 0
+      }
+      root._pomodoroStatsDate = today
+    }
+
     Logger.i("ns-dynamic-island", "initialized on",
       CompositorService.isNiri ? "niri"
         : (CompositorService.isHyprland ? "hyprland" : "other"))
@@ -1349,22 +1364,6 @@ Item {
   function _todayString() {
     const d = new Date()
     return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate()
-  }
-
-  Component.onCompleted: {
-    // Roll-over stats if it's a new day
-    if (root.pomodoroStatsEnabled) {
-      const today = root._todayString()
-      const savedDate = root.cfg.pomodoroStatsDate || ""
-      if (savedDate === today) {
-        root.pomodoroTodayCycles = root.cfg.pomodoroTodayCycles || 0
-        root.pomodoroTodayFocusMin = root.cfg.pomodoroTodayFocusMin || 0
-      } else {
-        root.pomodoroTodayCycles = 0
-        root.pomodoroTodayFocusMin = 0
-      }
-      root._pomodoroStatsDate = today
-    }
   }
 
   function _persistPomodoroStats() {

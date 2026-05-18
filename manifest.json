@@ -1,7 +1,7 @@
 {
   "id": "ns-dynamic-island",
   "name": "Dynamic Island",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "minNoctaliaVersion": "4.6.6",
   "author": "William Theesfeld",
   "license": "MIT",
