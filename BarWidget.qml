@@ -461,12 +461,46 @@ Item {
         color: Qt.alpha(Color.mOutline, 0.5)
       }
 
-      // ── Media ────────────────────────────────────────
+      // ── Media (with album art chip) ──────────────────
       RowLayout {
         spacing: 4
         visible: root.mediaActive
 
+        // Album art chip (tiny rounded square)
+        Item {
+          width: capsuleHeight * 0.62
+          height: width
+          visible: MediaService.trackArtUrl && MediaService.trackArtUrl.length > 0
+          Layout.alignment: Qt.AlignVCenter
+
+          Rectangle {
+            anchors.fill: parent
+            radius: 3
+            color: Qt.alpha(Color.mSurfaceVariant, 0.6)
+            clip: true
+
+            Image {
+              anchors.fill: parent
+              source: MediaService.trackArtUrl
+              fillMode: Image.PreserveAspectCrop
+              visible: status === Image.Ready
+              asynchronous: true
+              cache: true
+              sourceSize.width: width * 2
+              sourceSize.height: height * 2
+            }
+            // accent ring
+            Rectangle {
+              anchors.fill: parent
+              radius: parent.radius
+              color: "transparent"
+              border.color: Qt.alpha(Color.mPrimary, 0.45)
+              border.width: 1
+            }
+          }
+        }
         NIcon {
+          visible: !(MediaService.trackArtUrl && MediaService.trackArtUrl.length > 0)
           icon: MediaService.isPlaying ? "media-play" : "media-pause"
           color: Color.mPrimary
           applyUiScale: true
