@@ -128,6 +128,12 @@ ColumnLayout {
   property int    editCpuPollSec:         cfg.cpuPollSec ?? def.cpuPollSec ?? 5
   property int    editCpuTempCritical:    cfg.cpuTempCritical ?? def.cpuTempCritical ?? 85
 
+  // Bar widget
+  property bool   editBarShowClock:         cfg.barShowClock ?? def.barShowClock ?? true
+  property bool   editBarShowMedia:         cfg.barShowMedia ?? def.barShowMedia ?? true
+  property bool   editBarShowNotifications: cfg.barShowNotifications ?? def.barShowNotifications ?? true
+  property string editBarClickAction:       cfg.barClickAction || def.barClickAction || "peek"
+
   spacing: Style.marginL
 
   // ════════ Master ════════
@@ -820,6 +826,43 @@ ColumnLayout {
 
   NDivider { Layout.fillWidth: true }
 
+  // ════════ Bar widget ════════
+  NLabel {
+    label: "Bar widget"
+    description: "An inline summary widget to drop into the Noctalia bar."
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Show clock fallback"
+    description: "When nothing else is happening, the bar widget shows the time."
+    checked: root.editBarShowClock
+    onToggled: checked => root.editBarShowClock = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Show current media"
+    checked: root.editBarShowMedia
+    onToggled: checked => root.editBarShowMedia = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Show pending notification"
+    checked: root.editBarShowNotifications
+    onToggled: checked => root.editBarShowNotifications = checked
+  }
+  NLabel { label: "Click action" }
+  NComboBox {
+    Layout.fillWidth: true
+    model: [
+      { key: "peek",   name: "Peek floating island" },
+      { key: "toggle", name: "Toggle floating island" }
+    ]
+    currentKey: root.editBarClickAction
+    onSelected: key => root.editBarClickAction = key
+  }
+
+  NDivider { Layout.fillWidth: true }
+
   // ════════ Monitors ════════
   NLabel {
     label: "Monitors"
@@ -965,6 +1008,12 @@ ColumnLayout {
     s.cpuEnabled = root.editCpuEnabled
     s.cpuPollSec = root.editCpuPollSec
     s.cpuTempCritical = root.editCpuTempCritical
+
+    // Bar widget
+    s.barShowClock = root.editBarShowClock
+    s.barShowMedia = root.editBarShowMedia
+    s.barShowNotifications = root.editBarShowNotifications
+    s.barClickAction = root.editBarClickAction
 
     pluginApi.saveSettings()
   }

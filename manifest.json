@@ -17,8 +17,18 @@
   ],
   "entryPoints": {
     "main": "Main.qml",
-    "settings": "Settings.qml"
+    "settings": "Settings.qml",
+    "widget": "BarWidget.qml",
+    "barWidget": "BarWidget.qml"
   },
+  "barWidgets": [
+    {
+      "id": "ns-dynamic-island.bar",
+      "name": "Dynamic Island",
+      "description": "Compact island summary embeddable in the Noctalia bar.",
+      "entry": "BarWidget.qml"
+    }
+  ],
   "dependencies": {
     "plugins": []
   },
@@ -117,7 +127,12 @@
 
       "cpuEnabled": false,
       "cpuPollSec": 5,
-      "cpuTempCritical": 85
+      "cpuTempCritical": 85,
+
+      "barShowClock": true,
+      "barShowMedia": true,
+      "barShowNotifications": true,
+      "barClickAction": "peek"
     }
   }
 }

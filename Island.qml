@@ -31,6 +31,20 @@ PanelWindow {
 
   implicitHeight: main.islandHeight + 36
 
+  // Input mask: only the pill (plus the open context menu) accept pointer
+  // events; the rest of the panel surface passes clicks through to the
+  // bar beneath. Without this, the layer-shell surface ends up either
+  // swallowing clicks across the full screen width or accepting none at
+  // all (compositor-dependent) — either way the user can't interact
+  // with the pill.
+  mask: Region {
+    item: pill
+    Region {
+      item: ctxMenu
+      intersection: Intersection.Combine
+    }
+  }
+
   Connections {
     target: main
     function onShouldShowChanged() {
@@ -118,11 +132,20 @@ PanelWindow {
       z: -2
     }
 
+    // Context menu auto-close (5s after open, in case input routing is wonky)
+    Timer {
+      id: ctxAutoClose
+      interval: 5000
+      repeat: false
+      onTriggered: ctxMenu.visible = false
+    }
+
     // Context menu (sibling of pill so it isn't clipped)
     Rectangle {
       id: ctxMenu
       visible: false
       property var items: []
+      onVisibleChanged: if (visible) ctxAutoClose.restart(); else ctxAutoClose.stop()
 
       function refresh() {
         items = pill.ctxMenuModel()
