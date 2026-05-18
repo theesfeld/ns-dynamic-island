@@ -1,7 +1,7 @@
 {
   "id": "ns-dynamic-island",
   "name": "Dynamic Island",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "minNoctaliaVersion": "4.6.6",
   "author": "William Theesfeld",
   "license": "MIT",
@@ -137,6 +137,10 @@
       "barClickAction": "panel",
       "activeWindowMaxChars": 28,
       "mediaTitleMaxChars": 22,
+      "glassEffect": true,
+      "barHoverLift": true,
+      "barClickRipple": true,
+      "barDynamicAccent": true,
 
       "keyboardLayoutAutoPoll": true,
       "keyboardLayoutPollSec": 2,

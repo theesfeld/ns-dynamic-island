@@ -143,6 +143,10 @@ ColumnLayout {
   property string editBarClickAction:       cfg.barClickAction || def.barClickAction || "panel"
   property int    editActiveWindowMaxChars: cfg.activeWindowMaxChars ?? def.activeWindowMaxChars ?? 28
   property int    editMediaTitleMaxChars:   cfg.mediaTitleMaxChars ?? def.mediaTitleMaxChars ?? 22
+  property bool   editGlassEffect:          cfg.glassEffect ?? def.glassEffect ?? true
+  property bool   editBarHoverLift:         cfg.barHoverLift ?? def.barHoverLift ?? true
+  property bool   editBarClickRipple:       cfg.barClickRipple ?? def.barClickRipple ?? true
+  property bool   editBarDynamicAccent:     cfg.barDynamicAccent ?? def.barDynamicAccent ?? true
 
   // Auto-polling
   property bool   editKeyboardLayoutAutoPoll: cfg.keyboardLayoutAutoPoll ?? def.keyboardLayoutAutoPoll ?? true
@@ -1289,6 +1293,39 @@ ColumnLayout {
     onSelected: key => root.editBarClickAction = key
   }
 
+  NLabel {
+    label: "Bar widget visual effects"
+    description: "Glass-morphism styling on the capsule."
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Glass effect"
+    description: "Translucent capsule + top-edge highlight + drop shadow."
+    checked: root.editGlassEffect
+    onToggled: checked => root.editGlassEffect = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Hover lift"
+    description: "Subtle scale-up when the cursor is over the widget."
+    checked: root.editBarHoverLift
+    onToggled: checked => root.editBarHoverLift = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Click ripple"
+    description: "Material-style ripple emitted from the click point."
+    checked: root.editBarClickRipple
+    onToggled: checked => root.editBarClickRipple = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Dynamic accent line"
+    description: "Bottom edge tints to match what's most prominent (media / recording / urgency)."
+    checked: root.editBarDynamicAccent
+    onToggled: checked => root.editBarDynamicAccent = checked
+  }
+
   NDivider { Layout.fillWidth: true }
 
   // ════════ Monitors ════════
@@ -1452,6 +1489,10 @@ ColumnLayout {
     s.barClickAction = root.editBarClickAction
     s.activeWindowMaxChars = root.editActiveWindowMaxChars
     s.mediaTitleMaxChars = root.editMediaTitleMaxChars
+    s.glassEffect = root.editGlassEffect
+    s.barHoverLift = root.editBarHoverLift
+    s.barClickRipple = root.editBarClickRipple
+    s.barDynamicAccent = root.editBarDynamicAccent
 
     // Automation
     s.keyboardLayoutAutoPoll = root.editKeyboardLayoutAutoPoll

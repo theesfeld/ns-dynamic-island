@@ -134,15 +134,32 @@ Item {
     color: "transparent"
 
     Rectangle {
+      id: glassPanel
       anchors {
         fill: parent
         margins: Style.marginS
       }
-      color: Style.capsuleColor
+      color: Qt.alpha(Style.capsuleColor, Style.opacityHeavy)
       radius: Style.radiusL
       border.color: Style.capsuleBorderColor
       border.width: Style.capsuleBorderWidth
       clip: true
+
+      // Top highlight band for glass effect
+      Rectangle {
+        anchors {
+          left: parent.left
+          right: parent.right
+          top: parent.top
+          margins: 1
+        }
+        height: parent.height * 0.45
+        radius: parent.radius
+        gradient: Gradient {
+          GradientStop { position: 0.0; color: Qt.alpha("#ffffff", 0.14) }
+          GradientStop { position: 1.0; color: Qt.alpha("#ffffff", 0.0) }
+        }
+      }
 
       ColumnLayout {
         anchors {
@@ -381,8 +398,11 @@ Item {
           NIconButton {
             icon: "moon"
             Layout.fillWidth: true
-            onClicked: Quickshell.execDetached(["sh", "-c",
-              "qs ipc call plugin:ns-dynamic-island dnd " + (root.cfg.dndEnabled ? "false" : "true") + " 2>/dev/null || true"])
+            onClicked: {
+              if (!root.pluginApi || !root.pluginApi.pluginSettings) return
+              root.pluginApi.pluginSettings.dndEnabled = !root.pluginApi.pluginSettings.dndEnabled
+              try { root.pluginApi.saveSettings() } catch (e) {}
+            }
           }
           NIconButton {
             icon: "timer"
@@ -393,8 +413,12 @@ Item {
           NIconButton {
             icon: "eye"
             Layout.fillWidth: true
-            onClicked: Quickshell.execDetached(["sh", "-c",
-              "qs ipc call plugin:ns-dynamic-island toggle 2>/dev/null || true"])
+            onClicked: {
+              if (!root.pluginApi || !root.pluginApi.pluginSettings) return
+              root.pluginApi.pluginSettings.overlayEnabled =
+                !root.pluginApi.pluginSettings.overlayEnabled
+              try { root.pluginApi.saveSettings() } catch (e) {}
+            }
           }
         }
       }

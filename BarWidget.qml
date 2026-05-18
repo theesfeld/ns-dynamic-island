@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -10,17 +11,16 @@ import qs.Services.Media
 import qs.Services.UI
 import qs.Widgets
 
-// Bar widget for Noctalia — a true mini dynamic island. Shows multiple
-// concurrent pieces of state in one morphing capsule:
-//   [active-window-icon] window-title │ ♪ Track │ [REC 12:34] │ 🔔 │ ⏲ 19:43 │ 12:34 ☀ 22°C
-// Click to open the expanded Panel.qml. Right-click for context menu.
+// Bar widget for Noctalia — a true mini dynamic island. Glass-morphism
+// capsule with multi-layered highlights, drop shadow, hover lift, click
+// ripple, and live state from every interesting subsystem.
 Item {
   id: root
 
   // Plugin API (injected by PluginService)
   property var pluginApi: null
 
-  // Required bar widget properties
+  // Bar widget contract (Noctalia)
   property ShellScreen screen
   property string widgetId: ""
   property string section: ""
@@ -46,11 +46,16 @@ Item {
   readonly property bool barShowBattery:        cfg.barShowBattery        ?? defaults.barShowBattery        ?? true
   readonly property bool barShowPomodoro:       cfg.barShowPomodoro       ?? defaults.barShowPomodoro       ?? true
   readonly property bool barShowPrivacy:        cfg.barShowPrivacy        ?? defaults.barShowPrivacy        ?? true
-  readonly property string barClickAction:      cfg.barClickAction || defaults.barClickAction || "panel"
   readonly property int  activeWindowMaxChars:  cfg.activeWindowMaxChars  ?? defaults.activeWindowMaxChars  ?? 28
   readonly property int  mediaTitleMaxChars:    cfg.mediaTitleMaxChars    ?? defaults.mediaTitleMaxChars    ?? 22
 
-  // ── Active window (reactive via CompositorService) ───────
+  // Visual settings
+  readonly property bool glassEffect:    cfg.glassEffect    ?? defaults.glassEffect    ?? true
+  readonly property bool hoverLift:      cfg.barHoverLift   ?? defaults.barHoverLift   ?? true
+  readonly property bool clickRipple:    cfg.barClickRipple ?? defaults.barClickRipple ?? true
+  readonly property bool dynamicAccent:  cfg.barDynamicAccent ?? defaults.barDynamicAccent ?? true
+
+  // ── Active window (via CompositorService) ────────────────
   property string activeWindowTitle: ""
   property string activeWindowAppId: ""
 
@@ -77,6 +82,7 @@ Item {
 
   Component.onCompleted: refreshActiveWindow()
 
+  // ── Polled state ─────────────────────────────────────────
   property bool   recordingActive: false
   property string recordingElapsed: ""
   property real   recordingStartedAtMs: 0
@@ -94,7 +100,7 @@ Item {
   property bool   micInUse: false
   property bool   camInUse: false
 
-  // ── Reactive state from Noctalia services ────────────────
+  // ── Services (reactive) ──────────────────────────────────
   readonly property bool mediaActive: barShowMedia && MediaService.trackTitle.length > 0
   readonly property bool notifActive: barShowNotifications
     && NotificationService.popupModel
@@ -105,7 +111,6 @@ Item {
     ? firstNotif.urgency : 1
 
   property string clockText: ""
-
   Timer {
     interval: 15000
     running: root.barShowClock
@@ -177,7 +182,7 @@ Item {
     onExited: running = false
   }
 
-  // ── Weather: read from the shared cache file written by Main.qml ──
+  // ── Weather (from shared cache file) ─────────────────────
   Timer {
     interval: 30 * 60 * 1000
     running: root.barShowWeather
@@ -204,7 +209,7 @@ Item {
     onExited: running = false
   }
 
-  // ── Privacy (mic/cam) polling ────────────────────────────
+  // ── Privacy (mic / cam) polling ──────────────────────────
   Timer {
     interval: 4000
     running: root.barShowPrivacy
@@ -267,6 +272,18 @@ Item {
   readonly property bool batteryShouldShow:
     barShowBattery && batteryLevel >= 0 && (batteryLevel <= 25 || batteryState === "Charging")
 
+  // Dynamic accent — color the capsule subtly based on what's "primary"
+  readonly property color dynamicAccentColor: {
+    if (!dynamicAccent) return Color.mPrimary
+    if (notifActive && notifUrgency === 2) return Color.mError
+    if (recordingActive) return Color.mError
+    if (batteryLevel >= 0 && batteryLevel <= 10 && batteryState !== "Charging") return Color.mError
+    if (pomodoroActive && pomodoroPhase === "work") return Color.mError
+    if (mediaActive) return Color.mPrimary
+    if (notifActive) return Color.mTertiary
+    return Color.mPrimary
+  }
+
   // ── Dimensions ───────────────────────────────────────────
   readonly property real contentWidth: content.implicitWidth + Style.marginM * 2
   readonly property real contentHeight: capsuleHeight
@@ -274,23 +291,91 @@ Item {
   implicitWidth: contentWidth
   implicitHeight: contentHeight
 
-  Behavior on implicitWidth { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+  Behavior on implicitWidth { NumberAnimation { duration: Style.animationNormal; easing.type: Easing.OutCubic } }
 
-  // ── Visual capsule ───────────────────────────────────────
-  Rectangle {
-    id: visualCapsule
-    x: Style.pixelAlignCenter(parent.width, width)
-    y: Style.pixelAlignCenter(parent.height, height)
+  // ── Visual capsule with glass-morphism ───────────────────
+  Item {
+    id: capsuleWrapper
     width: root.contentWidth
     height: root.contentHeight
-    color: mouseArea.containsMouse ? Color.mHover : Style.capsuleColor
-    radius: Style.radiusL
-    border.color: Style.capsuleBorderColor
-    border.width: Style.capsuleBorderWidth
-    clip: true
+    x: Style.pixelAlignCenter(parent.width, width)
+    y: Style.pixelAlignCenter(parent.height, height)
+    scale: (root.hoverLift && mouseArea.containsMouse) ? 1.04 : 1.0
 
-    Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-    Behavior on color { ColorAnimation { duration: 140 } }
+    Behavior on scale {
+      NumberAnimation { duration: Style.animationFast; easing.type: Easing.OutCubic }
+    }
+
+    // Drop shadow under the capsule
+    Rectangle {
+      anchors.fill: parent
+      anchors.margins: -2
+      radius: parent.height / 2
+      color: "transparent"
+      visible: root.glassEffect
+      border.color: Qt.alpha("#000000", Style.shadowOpacity * 0.18)
+      border.width: 2
+      z: -2
+    }
+    Rectangle {
+      anchors.fill: parent
+      anchors.margins: -1
+      radius: parent.height / 2
+      color: "transparent"
+      visible: root.glassEffect
+      border.color: Qt.alpha("#000000", Style.shadowOpacity * 0.30)
+      border.width: 1
+      z: -2
+    }
+
+    // Main capsule background
+    Rectangle {
+      id: visualCapsule
+      anchors.fill: parent
+      radius: Style.radiusL
+      // Slightly lighter when hovered for affordance
+      color: mouseArea.containsMouse
+        ? Color.mHover
+        : (root.glassEffect ? Qt.alpha(Style.capsuleColor, Style.opacityHeavy) : Style.capsuleColor)
+      border.color: Style.capsuleBorderColor
+      border.width: Style.capsuleBorderWidth
+      clip: true
+
+      Behavior on color { ColorAnimation { duration: Style.animationFast } }
+
+      // Glass top-edge highlight: gradient from light at top, fading down
+      Rectangle {
+        anchors {
+          left: parent.left
+          right: parent.right
+          top: parent.top
+          margins: 1
+        }
+        height: parent.height / 2
+        radius: parent.radius
+        visible: root.glassEffect
+        gradient: Gradient {
+          GradientStop { position: 0.0; color: Qt.alpha("#ffffff", 0.16) }
+          GradientStop { position: 1.0; color: Qt.alpha("#ffffff", 0.0) }
+        }
+      }
+
+      // Dynamic accent line at the very bottom (1px) - a subtle activity indicator
+      Rectangle {
+        anchors {
+          left: parent.left
+          right: parent.right
+          bottom: parent.bottom
+          leftMargin: parent.radius
+          rightMargin: parent.radius
+        }
+        height: 1
+        opacity: 0.55
+        color: root.dynamicAccentColor
+        visible: root.dynamicAccent
+        Behavior on color { ColorAnimation { duration: Style.animationNormal } }
+      }
+    }
 
     // Critical urgency / recording / low battery glow ring
     readonly property bool glowOn:
@@ -300,18 +385,44 @@ Item {
 
     Rectangle {
       anchors.fill: parent
-      anchors.margins: -2
-      radius: parent.radius + 2
+      anchors.margins: -3
+      radius: parent.height / 2 + 3
       color: "transparent"
       border.width: 1
       border.color: Color.mError
-      visible: visualCapsule.glowOn
+      visible: capsuleWrapper.glowOn
+      z: -1
 
       SequentialAnimation on opacity {
-        running: visualCapsule.glowOn
+        running: capsuleWrapper.glowOn
         loops: Animation.Infinite
-        NumberAnimation { to: 0.4; duration: 800; easing.type: Easing.InOutSine }
-        NumberAnimation { to: 1.0; duration: 800; easing.type: Easing.InOutSine }
+        NumberAnimation { to: 0.3; duration: 900; easing.type: Easing.InOutSine }
+        NumberAnimation { to: 1.0; duration: 900; easing.type: Easing.InOutSine }
+      }
+    }
+
+    // Click ripple (spawned on press)
+    Item {
+      anchors.fill: parent
+      clip: true
+      visible: root.clickRipple
+
+      Rectangle {
+        id: ripple
+        width: 12; height: 12
+        radius: 6
+        color: Qt.alpha(root.dynamicAccentColor, 0.4)
+        opacity: 0
+        scale: 1
+
+        ParallelAnimation {
+          id: rippleAnim
+          NumberAnimation { target: ripple; property: "scale"; from: 1; to: 25; duration: 500; easing.type: Easing.OutCubic }
+          SequentialAnimation {
+            NumberAnimation { target: ripple; property: "opacity"; from: 0.55; to: 0.55; duration: 60 }
+            NumberAnimation { target: ripple; property: "opacity"; to: 0; duration: 440; easing.type: Easing.OutQuad }
+          }
+        }
       }
     }
 
@@ -334,6 +445,7 @@ Item {
           text: root.truncate(root.activeWindowTitle, root.activeWindowMaxChars)
           color: Color.mOnSurface
           pointSize: barFontSize
+          font.weight: Font.Medium
           elide: Text.ElideRight
           Layout.maximumWidth: 240
         }
@@ -342,7 +454,8 @@ Item {
       Rectangle {
         visible: root.barShowActiveWindow && root.activeWindowTitle.length > 0
           && (root.mediaActive || root.recordingActive || root.notifActive
-              || root.pomodoroActive || root.batteryShouldShow)
+              || root.pomodoroActive || root.batteryShouldShow
+              || (root.barShowPrivacy && (root.micInUse || root.camInUse)))
         Layout.preferredWidth: 1
         Layout.preferredHeight: parent.height * 0.55
         color: Qt.alpha(Color.mOutline, 0.5)
@@ -354,9 +467,17 @@ Item {
         visible: root.mediaActive
 
         NIcon {
-          icon: MediaService.isPlaying ? "player-play" : "player-pause"
+          icon: MediaService.isPlaying ? "media-play" : "media-pause"
           color: Color.mPrimary
           applyUiScale: true
+
+          // Subtle pulse while playing
+          SequentialAnimation on scale {
+            running: MediaService.isPlaying
+            loops: Animation.Infinite
+            NumberAnimation { to: 1.12; duration: 700; easing.type: Easing.InOutSine }
+            NumberAnimation { to: 1.0;  duration: 700; easing.type: Easing.InOutSine }
+          }
         }
         NText {
           text: root.truncate(MediaService.trackTitle, root.mediaTitleMaxChars)
@@ -370,7 +491,8 @@ Item {
       Rectangle {
         visible: root.mediaActive
           && (root.recordingActive || root.notifActive
-              || root.pomodoroActive || root.batteryShouldShow)
+              || root.pomodoroActive || root.batteryShouldShow
+              || (root.barShowPrivacy && (root.micInUse || root.camInUse)))
         Layout.preferredWidth: 1
         Layout.preferredHeight: parent.height * 0.55
         color: Qt.alpha(Color.mOutline, 0.5)
@@ -381,14 +503,39 @@ Item {
         spacing: 4
         visible: root.barShowRecording && root.recordingActive
 
-        Rectangle {
-          width: 8; height: 8; radius: 4
-          color: Color.mError
-          SequentialAnimation on opacity {
-            running: root.recordingActive
-            loops: Animation.Infinite
-            NumberAnimation { to: 0.35; duration: 700; easing.type: Easing.InOutSine }
-            NumberAnimation { to: 1.0;  duration: 700; easing.type: Easing.InOutSine }
+        Item {
+          width: 10; height: 10
+
+          Rectangle {
+            anchors.centerIn: parent
+            width: 8; height: 8; radius: 4
+            color: Color.mError
+            SequentialAnimation on opacity {
+              running: root.recordingActive
+              loops: Animation.Infinite
+              NumberAnimation { to: 0.35; duration: 700; easing.type: Easing.InOutSine }
+              NumberAnimation { to: 1.0;  duration: 700; easing.type: Easing.InOutSine }
+            }
+          }
+          // Halo ring
+          Rectangle {
+            anchors.centerIn: parent
+            width: 8; height: 8; radius: 4
+            color: "transparent"
+            border.color: Qt.alpha(Color.mError, 0.6)
+            border.width: 1
+            SequentialAnimation on scale {
+              running: root.recordingActive
+              loops: Animation.Infinite
+              NumberAnimation { to: 2.0; duration: 1400; easing.type: Easing.OutQuad }
+              NumberAnimation { to: 1.0; duration: 0 }
+            }
+            SequentialAnimation on opacity {
+              running: root.recordingActive
+              loops: Animation.Infinite
+              NumberAnimation { from: 0.7; to: 0; duration: 1400; easing.type: Easing.OutQuad }
+              NumberAnimation { to: 0.7; duration: 0 }
+            }
           }
         }
         NText {
@@ -410,7 +557,6 @@ Item {
           color: root.notifUrgency === 2 ? Color.mError : Color.mTertiary
           applyUiScale: true
         }
-        // Count badge
         Rectangle {
           visible: root.notifCount > 1
           radius: 8
@@ -456,6 +602,12 @@ Item {
           visible: root.micInUse
           width: 6; height: 6; radius: 3
           color: Color.mError
+          SequentialAnimation on opacity {
+            running: root.micInUse
+            loops: Animation.Infinite
+            NumberAnimation { to: 0.4; duration: 900; easing.type: Easing.InOutSine }
+            NumberAnimation { to: 1.0; duration: 900; easing.type: Easing.InOutSine }
+          }
         }
         Rectangle {
           visible: root.camInUse
@@ -486,7 +638,9 @@ Item {
       Rectangle {
         visible: (root.barShowClock || root.barShowWeather)
           && (root.activeWindowTitle.length > 0 || root.mediaActive
-              || root.recordingActive || root.notifActive || root.pomodoroActive)
+              || root.recordingActive || root.notifActive || root.pomodoroActive
+              || root.batteryShouldShow
+              || (root.barShowPrivacy && (root.micInUse || root.camInUse)))
         Layout.preferredWidth: 1
         Layout.preferredHeight: parent.height * 0.55
         color: Qt.alpha(Color.mOutline, 0.5)
@@ -526,27 +680,46 @@ Item {
     cursorShape: Qt.PointingHandCursor
     acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
 
+    onPressed: (mouse) => {
+      if (!root.clickRipple) return
+      ripple.x = mouse.x - ripple.width / 2
+      ripple.y = mouse.y - ripple.height / 2
+      rippleAnim.restart()
+    }
+
     onClicked: (mouse) => {
-      if (mouse.button === Qt.MiddleButton && root.mediaActive) {
-        Quickshell.execDetached(["sh", "-c", "playerctl play-pause 2>/dev/null || true"])
+      // Middle: media play/pause via service directly
+      if (mouse.button === Qt.MiddleButton) {
+        const p = MediaService.currentPlayer
+        if (p) { if (MediaService.isPlaying) p.pause(); else p.play() }
         return
       }
+      // Right: dismiss top notification if any, otherwise toggle DND
       if (mouse.button === Qt.RightButton) {
-        // Right-click: dismiss top notification or stop recording
-        if (root.notifActive) {
-          Quickshell.execDetached(["sh", "-c", "qs ipc call plugin:ns-dynamic-island hide 2>/dev/null || true"])
+        if (root.notifActive && root.firstNotif && typeof root.firstNotif.dismiss === "function") {
+          root.firstNotif.dismiss()
+        } else if (pluginApi && pluginApi.pluginSettings) {
+          pluginApi.pluginSettings.dndEnabled = !pluginApi.pluginSettings.dndEnabled
+          try { pluginApi.saveSettings() } catch (e) {}
         }
         return
       }
-      // Left-click: open the detail panel
-      if (root.barClickAction === "panel" && pluginApi && pluginApi.openPanel) {
-        if (pluginApi.panelOpenScreen) pluginApi.closePanel(root.screen)
-        else pluginApi.openPanel(root.screen, root)
-      } else if (root.barClickAction === "toggle") {
-        Quickshell.execDetached(["sh", "-c", "qs ipc call plugin:ns-dynamic-island toggle 2>/dev/null || true"])
-      } else {
-        Quickshell.execDetached(["sh", "-c", "qs ipc call plugin:ns-dynamic-island peek 2>/dev/null || true"])
+      // Left: toggle the detail panel
+      if (pluginApi && typeof pluginApi.togglePanel === "function") {
+        pluginApi.togglePanel(root.screen, root)
+      } else if (pluginApi && typeof pluginApi.openPanel === "function") {
+        pluginApi.openPanel(root.screen, root)
       }
+    }
+
+    // Scroll wheel: adjust system volume
+    onWheel: (event) => {
+      const sign = event.angleDelta.y > 0 ? 1 : -1
+      Quickshell.execDetached(["sh", "-c",
+        "if command -v wpctl >/dev/null 2>&1; then wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "
+        + (sign > 0 ? "5%+" : "5%-")
+        + "; elif command -v pactl >/dev/null 2>&1; then pactl set-sink-volume @DEFAULT_SINK@ "
+        + (sign > 0 ? "+5%" : "-5%") + "; fi"])
     }
   }
 }
