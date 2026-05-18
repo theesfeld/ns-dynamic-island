@@ -625,6 +625,7 @@ Item {
             Repeater {
               model: Math.min(5, root.notifCount)
               delegate: Rectangle {
+                id: notifCard
                 Layout.fillWidth: true
                 Layout.preferredHeight: notifRow.implicitHeight + 12
                 radius: 8
@@ -646,18 +647,18 @@ Item {
                   spacing: 8
 
                   Rectangle {
-                    width: 4
+                    Layout.preferredWidth: 4
                     Layout.fillHeight: true
                     radius: 2
-                    color: parent.parent.accent
+                    color: notifCard.accent
                   }
                   ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 0
                     NText {
                       Layout.fillWidth: true
-                      text: parent.parent.parent.n
-                        ? (parent.parent.parent.n.summary || parent.parent.parent.n.appName || "Notification")
+                      text: notifCard.n
+                        ? (notifCard.n.summary || notifCard.n.appName || "Notification")
                         : ""
                       color: Color.mOnSurface
                       pointSize: Style.fontSizeS
@@ -666,9 +667,8 @@ Item {
                     }
                     NText {
                       Layout.fillWidth: true
-                      visible: parent.parent.parent.n && parent.parent.parent.n.body
-                        && parent.parent.parent.n.body.length > 0
-                      text: parent.parent.parent.n ? parent.parent.parent.n.body : ""
+                      visible: notifCard.n && notifCard.n.body && notifCard.n.body.length > 0
+                      text: notifCard.n ? notifCard.n.body : ""
                       color: Color.mOnSurfaceVariant
                       pointSize: Style.fontSizeXS
                       elide: Text.ElideRight
@@ -679,8 +679,9 @@ Item {
                   NIconButton {
                     icon: "close"
                     onClicked: {
-                      const n = parent.parent.n
-                      if (n && typeof n.dismiss === "function") n.dismiss()
+                      if (notifCard.n) {
+                        try { notifCard.n.dismiss() } catch (e) {}
+                      }
                     }
                   }
                 }

@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -722,6 +721,10 @@ Item {
     }
 
     onClicked: (mouse) => {
+      Logger.i("ns-dynamic-island", "bar click",
+        mouse.button === Qt.LeftButton ? "left" :
+        mouse.button === Qt.RightButton ? "right" : "middle")
+
       // Middle: media play/pause via service directly
       if (mouse.button === Qt.MiddleButton) {
         const p = MediaService.currentPlayer
@@ -730,19 +733,35 @@ Item {
       }
       // Right: dismiss top notification if any, otherwise toggle DND
       if (mouse.button === Qt.RightButton) {
-        if (root.notifActive && root.firstNotif && typeof root.firstNotif.dismiss === "function") {
-          root.firstNotif.dismiss()
-        } else if (pluginApi && pluginApi.pluginSettings) {
+        if (root.notifActive && root.firstNotif) {
+          try { root.firstNotif.dismiss() } catch (e) {
+            Logger.w("ns-dynamic-island", "dismiss failed:", e)
+          }
+        }
+        if (pluginApi && pluginApi.pluginSettings) {
           pluginApi.pluginSettings.dndEnabled = !pluginApi.pluginSettings.dndEnabled
-          try { pluginApi.saveSettings() } catch (e) {}
+          try { pluginApi.saveSettings() } catch (e) {
+            Logger.w("ns-dynamic-island", "saveSettings failed:", e)
+          }
         }
         return
       }
-      // Left: toggle the detail panel
-      if (pluginApi && typeof pluginApi.togglePanel === "function") {
+      // Left: toggle the detail panel. QML-injected methods may not pass
+      // a typeof === "function" check, so just try the call and let it
+      // throw if the method isn't there.
+      if (!pluginApi) {
+        Logger.w("ns-dynamic-island", "no pluginApi on left click")
+        return
+      }
+      try {
         pluginApi.togglePanel(root.screen, root)
-      } else if (pluginApi && typeof pluginApi.openPanel === "function") {
-        pluginApi.openPanel(root.screen, root)
+      } catch (e1) {
+        Logger.w("ns-dynamic-island", "togglePanel failed:", e1, "— trying openPanel")
+        try {
+          pluginApi.openPanel(root.screen, root)
+        } catch (e2) {
+          Logger.w("ns-dynamic-island", "openPanel also failed:", e2)
+        }
       }
     }
 
