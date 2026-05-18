@@ -10,6 +10,29 @@ Item {
   readonly property bool expanded: main.expanded
   readonly property var notif: main.activeNotification
 
+  // Slide-in on new notification
+  property real _slideX: 0
+  transform: Translate { x: root._slideX }
+
+  Connections {
+    target: main
+    function onActiveNotificationChanged() {
+      if (!main.effectsNotificationSlide) return
+      if (main.activeNotification) {
+        root._slideX = 24
+        slideAnim.restart()
+      }
+    }
+  }
+  NumberAnimation {
+    id: slideAnim
+    target: root
+    property: "_slideX"
+    from: 24; to: 0
+    duration: 280
+    easing.type: Easing.OutCubic
+  }
+
   readonly property int urgency: notif ? (notif.urgency | 0) : 1
   readonly property color accent:
       urgency === 2 ? Color.mError

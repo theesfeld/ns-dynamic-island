@@ -134,6 +134,30 @@ ColumnLayout {
   property bool   editBarShowNotifications: cfg.barShowNotifications ?? def.barShowNotifications ?? true
   property string editBarClickAction:       cfg.barClickAction || def.barClickAction || "peek"
 
+  // Auto-polling
+  property bool   editKeyboardLayoutAutoPoll: cfg.keyboardLayoutAutoPoll ?? def.keyboardLayoutAutoPoll ?? true
+  property int    editKeyboardLayoutPollSec:  cfg.keyboardLayoutPollSec ?? def.keyboardLayoutPollSec ?? 2
+  property bool   editWorkspaceAutoPoll:      cfg.workspaceAutoPoll ?? def.workspaceAutoPoll ?? true
+  property int    editWorkspacePollSec:       cfg.workspacePollSec ?? def.workspacePollSec ?? 2
+  property bool   editVolumeAutoPoll:         cfg.volumeAutoPoll ?? def.volumeAutoPoll ?? true
+  property int    editVolumePollMs:           cfg.volumePollMs ?? def.volumePollMs ?? 800
+  property bool   editBrightnessAutoPoll:     cfg.brightnessAutoPoll ?? def.brightnessAutoPoll ?? true
+  property int    editBrightnessPollMs:       cfg.brightnessPollMs ?? def.brightnessPollMs ?? 1200
+  property bool   editScreenshotAutoWatch:    cfg.screenshotAutoWatch ?? def.screenshotAutoWatch ?? true
+  property int    editScreenshotPollSec:      cfg.screenshotPollSec ?? def.screenshotPollSec ?? 3
+
+  // Sounds
+  property bool   editNotificationSound:     cfg.notificationSound ?? def.notificationSound ?? false
+  property string editNotificationSoundPath: cfg.notificationSoundPath || def.notificationSoundPath || ""
+
+  // Effects
+  property bool   editEffectsRipple:            cfg.effectsRipple ?? def.effectsRipple ?? true
+  property bool   editEffectsHoverLift:         cfg.effectsHoverLift ?? def.effectsHoverLift ?? true
+  property bool   editEffectsTrackFlash:        cfg.effectsTrackFlash ?? def.effectsTrackFlash ?? true
+  property bool   editEffectsAudioBars:         cfg.effectsAudioBars ?? def.effectsAudioBars ?? true
+  property bool   editEffectsConfetti:          cfg.effectsConfetti ?? def.effectsConfetti ?? true
+  property bool   editEffectsNotificationSlide: cfg.effectsNotificationSlide ?? def.effectsNotificationSlide ?? true
+
   spacing: Style.marginL
 
   // ════════ Master ════════
@@ -826,6 +850,158 @@ ColumnLayout {
 
   NDivider { Layout.fillWidth: true }
 
+  // ════════ Effects ════════
+  NLabel {
+    label: "Effects"
+    description: "Extra visual flair. Toggle off if you prefer a quieter pill."
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Click ripple"
+    description: "Material-style ripple at the click point."
+    checked: root.editEffectsRipple
+    onToggled: checked => root.editEffectsRipple = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Hover lift"
+    description: "Subtle scale-up when hovered."
+    checked: root.editEffectsHoverLift
+    onToggled: checked => root.editEffectsHoverLift = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Track-change flash"
+    description: "Brief flip + white flash on the album art when the track changes."
+    checked: root.editEffectsTrackFlash
+    onToggled: checked => root.editEffectsTrackFlash = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Media audio bars"
+    description: "Animated bars in the media bubble while playing."
+    checked: root.editEffectsAudioBars
+    onToggled: checked => root.editEffectsAudioBars = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Confetti burst"
+    description: "Celebrate pomodoro breaks and finished downloads with emoji confetti."
+    checked: root.editEffectsConfetti
+    onToggled: checked => root.editEffectsConfetti = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Notification slide-in"
+    checked: root.editEffectsNotificationSlide
+    onToggled: checked => root.editEffectsNotificationSlide = checked
+  }
+
+  NDivider { Layout.fillWidth: true }
+
+  // ════════ Automation / auto-poll ════════
+  NLabel {
+    label: "Automation"
+    description: "Background pollers so features work without you binding IPC manually."
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Auto-OSD on volume change"
+    description: "Polls wpctl/pactl. Default sink only."
+    checked: root.editVolumeAutoPoll
+    onToggled: checked => root.editVolumeAutoPoll = checked
+  }
+  NLabel { label: "Volume poll interval (ms): " + root.editVolumePollMs; visible: root.editVolumeAutoPoll }
+  NSlider {
+    Layout.fillWidth: true
+    from: 300; to: 3000; stepSize: 100
+    visible: root.editVolumeAutoPoll
+    value: root.editVolumePollMs
+    onValueChanged: root.editVolumePollMs = value
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Auto-OSD on brightness change"
+    description: "Polls brightnessctl or /sys/class/backlight."
+    checked: root.editBrightnessAutoPoll
+    onToggled: checked => root.editBrightnessAutoPoll = checked
+  }
+  NLabel { label: "Brightness poll interval (ms): " + root.editBrightnessPollMs; visible: root.editBrightnessAutoPoll }
+  NSlider {
+    Layout.fillWidth: true
+    from: 400; to: 4000; stepSize: 100
+    visible: root.editBrightnessAutoPoll
+    value: root.editBrightnessPollMs
+    onValueChanged: root.editBrightnessPollMs = value
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Auto-detect workspace switches"
+    description: "Polls niri / hyprctl."
+    checked: root.editWorkspaceAutoPoll
+    onToggled: checked => root.editWorkspaceAutoPoll = checked
+  }
+  NLabel { label: "Workspace poll (s): " + root.editWorkspacePollSec; visible: root.editWorkspaceAutoPoll }
+  NSlider {
+    Layout.fillWidth: true
+    from: 1; to: 10; stepSize: 1
+    visible: root.editWorkspaceAutoPoll
+    value: root.editWorkspacePollSec
+    onValueChanged: root.editWorkspacePollSec = value
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Auto-detect keyboard layout switches"
+    description: "Polls niri / hyprctl / setxkbmap."
+    checked: root.editKeyboardLayoutAutoPoll
+    onToggled: checked => root.editKeyboardLayoutAutoPoll = checked
+  }
+  NLabel { label: "Keyboard layout poll (s): " + root.editKeyboardLayoutPollSec; visible: root.editKeyboardLayoutAutoPoll }
+  NSlider {
+    Layout.fillWidth: true
+    from: 1; to: 10; stepSize: 1
+    visible: root.editKeyboardLayoutAutoPoll
+    value: root.editKeyboardLayoutPollSec
+    onValueChanged: root.editKeyboardLayoutPollSec = value
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Watch screenshot directory for new files"
+    checked: root.editScreenshotAutoWatch
+    onToggled: checked => root.editScreenshotAutoWatch = checked
+  }
+  NLabel { label: "Screenshot poll (s): " + root.editScreenshotPollSec; visible: root.editScreenshotAutoWatch }
+  NSlider {
+    Layout.fillWidth: true
+    from: 1; to: 30; stepSize: 1
+    visible: root.editScreenshotAutoWatch
+    value: root.editScreenshotPollSec
+    onValueChanged: root.editScreenshotPollSec = value
+  }
+
+  NDivider { Layout.fillWidth: true }
+
+  // ════════ Sounds ════════
+  NLabel { label: "Sounds" }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Play sound on notification"
+    description: "Uses paplay / pw-play / aplay. Falls back to the freedesktop message sound."
+    checked: root.editNotificationSound
+    onToggled: checked => root.editNotificationSound = checked
+  }
+  NTextInput {
+    Layout.fillWidth: true
+    label: "Sound file"
+    description: "Path to .ogg/.wav. Leave empty for freedesktop default."
+    placeholderText: "/usr/share/sounds/freedesktop/stereo/message.oga"
+    text: root.editNotificationSoundPath
+    onEditingFinished: root.editNotificationSoundPath = text
+    visible: root.editNotificationSound
+  }
+
+  NDivider { Layout.fillWidth: true }
+
   // ════════ Bar widget ════════
   NLabel {
     label: "Bar widget"
@@ -1014,6 +1190,30 @@ ColumnLayout {
     s.barShowMedia = root.editBarShowMedia
     s.barShowNotifications = root.editBarShowNotifications
     s.barClickAction = root.editBarClickAction
+
+    // Automation
+    s.keyboardLayoutAutoPoll = root.editKeyboardLayoutAutoPoll
+    s.keyboardLayoutPollSec = root.editKeyboardLayoutPollSec
+    s.workspaceAutoPoll = root.editWorkspaceAutoPoll
+    s.workspacePollSec = root.editWorkspacePollSec
+    s.volumeAutoPoll = root.editVolumeAutoPoll
+    s.volumePollMs = root.editVolumePollMs
+    s.brightnessAutoPoll = root.editBrightnessAutoPoll
+    s.brightnessPollMs = root.editBrightnessPollMs
+    s.screenshotAutoWatch = root.editScreenshotAutoWatch
+    s.screenshotPollSec = root.editScreenshotPollSec
+
+    // Sounds
+    s.notificationSound = root.editNotificationSound
+    s.notificationSoundPath = root.editNotificationSoundPath
+
+    // Effects
+    s.effectsRipple = root.editEffectsRipple
+    s.effectsHoverLift = root.editEffectsHoverLift
+    s.effectsTrackFlash = root.editEffectsTrackFlash
+    s.effectsAudioBars = root.editEffectsAudioBars
+    s.effectsConfetti = root.editEffectsConfetti
+    s.effectsNotificationSlide = root.editEffectsNotificationSlide
 
     pluginApi.saveSettings()
   }

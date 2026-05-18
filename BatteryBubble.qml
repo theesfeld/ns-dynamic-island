@@ -76,9 +76,18 @@ Item {
       NText {
         Layout.fillWidth: true
         visible: root.expanded
-        text: root.charging
-          ? (root.state === "Full" ? "Fully charged" : "Charging")
-          : (root.critical ? "Critical" : (root.low ? "Low battery" : "Discharging"))
+        text: {
+          const base = root.charging
+            ? (root.state === "Full" ? "Fully charged" : "Charging")
+            : (root.critical ? "Critical" : (root.low ? "Low battery" : "Discharging"))
+          const m = main.batteryMinutesRemaining
+          if (m > 0 && root.state !== "Full") {
+            const h = Math.floor(m / 60), mm = m % 60
+            const suffix = h > 0 ? (h + "h " + mm + "m") : (mm + "m")
+            return base + " · " + suffix + (root.charging ? " to full" : " left")
+          }
+          return base
+        }
         color: Color.mOnSurfaceVariant
         pointSize: Style.fontSizeXS
         elide: Text.ElideRight

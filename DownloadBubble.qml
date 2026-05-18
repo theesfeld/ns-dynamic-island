@@ -39,10 +39,19 @@ Item {
         }
       }
       NIcon {
+        id: dlIcon
         anchors.centerIn: parent
         icon: "download"
         pointSize: Style.fontSizeS
         color: Color.mPrimary
+
+        // Spinner: only when progress is < 1
+        RotationAnimator on rotation {
+          running: root.progress < 1 && root.progress > 0
+          from: 0; to: 360
+          duration: 1400
+          loops: Animation.Infinite
+        }
       }
     }
 

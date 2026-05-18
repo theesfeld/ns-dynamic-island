@@ -1,7 +1,7 @@
 {
   "id": "ns-dynamic-island",
   "name": "Dynamic Island",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "minNoctaliaVersion": "4.6.6",
   "author": "William Theesfeld",
   "license": "MIT",
@@ -132,7 +132,28 @@
       "barShowClock": true,
       "barShowMedia": true,
       "barShowNotifications": true,
-      "barClickAction": "peek"
+      "barClickAction": "peek",
+
+      "keyboardLayoutAutoPoll": true,
+      "keyboardLayoutPollSec": 2,
+      "workspaceAutoPoll": true,
+      "workspacePollSec": 2,
+      "volumeAutoPoll": true,
+      "volumePollMs": 800,
+      "brightnessAutoPoll": true,
+      "brightnessPollMs": 1200,
+      "screenshotAutoWatch": true,
+      "screenshotPollSec": 3,
+
+      "notificationSound": false,
+      "notificationSoundPath": "",
+
+      "effectsRipple": true,
+      "effectsHoverLift": true,
+      "effectsTrackFlash": true,
+      "effectsAudioBars": true,
+      "effectsConfetti": true,
+      "effectsNotificationSlide": true
     }
   }
 }

@@ -111,9 +111,35 @@ Item {
 
   // Keyboard layout
   readonly property bool keyboardLayoutEnabled: cfg.keyboardLayoutEnabled ?? def.keyboardLayoutEnabled ?? true
+  readonly property bool keyboardLayoutAutoPoll: cfg.keyboardLayoutAutoPoll ?? def.keyboardLayoutAutoPoll ?? true
+  readonly property int  keyboardLayoutPollSec: cfg.keyboardLayoutPollSec ?? def.keyboardLayoutPollSec ?? 2
 
   // Workspace indicator
   readonly property bool workspaceEnabled: cfg.workspaceEnabled ?? def.workspaceEnabled ?? true
+  readonly property bool workspaceAutoPoll: cfg.workspaceAutoPoll ?? def.workspaceAutoPoll ?? true
+  readonly property int  workspacePollSec: cfg.workspacePollSec ?? def.workspacePollSec ?? 2
+
+  // Volume / brightness auto-poll (drives OSD without IPC bindings)
+  readonly property bool volumeAutoPoll: cfg.volumeAutoPoll ?? def.volumeAutoPoll ?? true
+  readonly property int  volumePollMs: cfg.volumePollMs ?? def.volumePollMs ?? 800
+  readonly property bool brightnessAutoPoll: cfg.brightnessAutoPoll ?? def.brightnessAutoPoll ?? true
+  readonly property int  brightnessPollMs: cfg.brightnessPollMs ?? def.brightnessPollMs ?? 1200
+
+  // Screenshot dir watcher
+  readonly property bool screenshotAutoWatch: cfg.screenshotAutoWatch ?? def.screenshotAutoWatch ?? true
+  readonly property int  screenshotPollSec:  cfg.screenshotPollSec ?? def.screenshotPollSec ?? 3
+
+  // Sound
+  readonly property bool notificationSound: cfg.notificationSound ?? def.notificationSound ?? false
+  readonly property string notificationSoundPath: cfg.notificationSoundPath || def.notificationSoundPath || ""
+
+  // Effects
+  readonly property bool effectsRipple: cfg.effectsRipple ?? def.effectsRipple ?? true
+  readonly property bool effectsHoverLift: cfg.effectsHoverLift ?? def.effectsHoverLift ?? true
+  readonly property bool effectsTrackFlash: cfg.effectsTrackFlash ?? def.effectsTrackFlash ?? true
+  readonly property bool effectsAudioBars: cfg.effectsAudioBars ?? def.effectsAudioBars ?? true
+  readonly property bool effectsConfetti: cfg.effectsConfetti ?? def.effectsConfetti ?? true
+  readonly property bool effectsNotificationSlide: cfg.effectsNotificationSlide ?? def.effectsNotificationSlide ?? true
 
   // Clipboard / Screenshot
   readonly property bool clipboardEnabled: cfg.clipboardEnabled ?? def.clipboardEnabled ?? false
@@ -247,6 +273,7 @@ Item {
         pinned: root.notificationPinnedApps.indexOf(appName) !== -1
       }
       notificationClearTimer.restart()
+      root.playNotificationSound()
     }
   }
 
@@ -664,6 +691,270 @@ Item {
     shotPeekTimer.restart()
   }
 
+  // ── Volume / brightness auto-poll ────────────────────────
+  property int  volumePrev: -1
+  property bool volumeMutedPrev: false
+  property int  brightnessPrev: -1
+  property bool _volumeFirstPoll: true
+  property bool _brightnessFirstPoll: true
+
+  Timer {
+    id: volumePoller
+    interval: Math.max(300, root.volumePollMs)
+    running: root.volumeAutoPoll && root.osdEnabled
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: if (!volumeProbe.running) volumeProbe.running = true
+  }
+
+  Process {
+    id: volumeProbe
+    running: false
+    command: ["sh", "-c",
+      "if command -v wpctl >/dev/null 2>&1; then " +
+      "  out=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null); " +
+      "  v=$(echo \"$out\" | awk '{print $2}'); " +
+      "  m=0; echo \"$out\" | grep -q MUTED && m=1; " +
+      "  awk -v v=\"$v\" -v m=\"$m\" 'BEGIN{printf \"%d|%d\\n\", v*100, m}'; " +
+      "elif command -v pactl >/dev/null 2>&1; then " +
+      "  v=$(pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | awk -F'/' 'NR==1{gsub(\"%\",\"\",$2); gsub(\" \",\"\",$2); print $2}'); " +
+      "  m=$(pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null | awk '{print $2}'); " +
+      "  [ \"$m\" = \"yes\" ] && mm=1 || mm=0; " +
+      "  echo \"${v:-0}|$mm\"; " +
+      "else echo \"0|0\"; fi"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        const line = (text || "").trim()
+        if (line.length === 0) return
+        const parts = line.split("|")
+        const v = parseInt(parts[0]) || 0
+        const m = (parts[1] || "0") === "1"
+        const changed = (v !== root.volumePrev) || (m !== root.volumeMutedPrev)
+        // Don't peek on the very first poll (we don't want a phantom OSD on launch)
+        if (changed && !root._volumeFirstPoll && root.osdEnabled) {
+          root.showOsd("volume", v, m)
+        }
+        root.volumePrev = v
+        root.volumeMutedPrev = m
+        root._volumeFirstPoll = false
+      }
+    }
+    onExited: running = false
+  }
+
+  Timer {
+    id: brightnessPoller
+    interval: Math.max(400, root.brightnessPollMs)
+    running: root.brightnessAutoPoll && root.osdEnabled
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: if (!brightnessProbe.running) brightnessProbe.running = true
+  }
+
+  Process {
+    id: brightnessProbe
+    running: false
+    command: ["sh", "-c",
+      "if command -v brightnessctl >/dev/null 2>&1; then " +
+      "  cur=$(brightnessctl g 2>/dev/null); max=$(brightnessctl m 2>/dev/null); " +
+      "  [ -n \"$cur\" ] && [ -n \"$max\" ] && [ \"$max\" -gt 0 ] && " +
+      "    awk -v c=\"$cur\" -v m=\"$max\" 'BEGIN{printf \"%d\\n\", (c/m)*100}'; " +
+      "elif [ -e /sys/class/backlight ]; then " +
+      "  for d in /sys/class/backlight/*/; do " +
+      "    cur=$(cat \"$d\"brightness 2>/dev/null); max=$(cat \"$d\"max_brightness 2>/dev/null); " +
+      "    [ -n \"$cur\" ] && [ -n \"$max\" ] && [ \"$max\" -gt 0 ] && " +
+      "      awk -v c=\"$cur\" -v m=\"$max\" 'BEGIN{printf \"%d\\n\", (c/m)*100}' && break; " +
+      "  done; " +
+      "fi"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        const line = (text || "").trim()
+        if (line.length === 0) return
+        const v = parseInt(line) || 0
+        if (v !== root.brightnessPrev && !root._brightnessFirstPoll && root.osdEnabled) {
+          root.showOsd("brightness", v, false)
+        }
+        root.brightnessPrev = v
+        root._brightnessFirstPoll = false
+      }
+    }
+    onExited: running = false
+  }
+
+  // ── Workspace auto-detect via niri/hyprctl ───────────────
+  Timer {
+    id: workspacePoller
+    interval: Math.max(500, root.workspacePollSec * 1000)
+    running: root.workspaceEnabled && root.workspaceAutoPoll
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: if (!workspaceProbe.running) workspaceProbe.running = true
+  }
+
+  property string _workspacePrev: ""
+  Process {
+    id: workspaceProbe
+    running: false
+    command: ["sh", "-c",
+      "if command -v niri >/dev/null 2>&1; then " +
+      "  niri msg --json focused-workspace 2>/dev/null | sed -n 's/.*\"idx\":\\s*\\([0-9]*\\).*\"name\":\\s*\"\\([^\"]*\\)\".*/\\1|\\2/p; s/.*\"name\":\\s*\"\\([^\"]*\\)\".*\"idx\":\\s*\\([0-9]*\\).*/\\2|\\1/p' | head -n1; " +
+      "elif command -v hyprctl >/dev/null 2>&1; then " +
+      "  hyprctl activeworkspace -j 2>/dev/null | sed -n 's/.*\"id\":\\s*\\([0-9]*\\).*\"name\":\\s*\"\\([^\"]*\\)\".*/\\1|\\2/p' | head -n1; " +
+      "fi"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        const line = (text || "").trim()
+        if (line.length === 0) return
+        if (line === root._workspacePrev) return
+        const parts = line.split("|")
+        root._workspacePrev = line
+        if (root.workspaceEnabled) root.workspaceShow(parts[0] || "", parts[1] || "")
+      }
+    }
+    onExited: running = false
+  }
+
+  // ── Keyboard layout auto-detect ──────────────────────────
+  Timer {
+    id: kbLayoutPoller
+    interval: Math.max(500, root.keyboardLayoutPollSec * 1000)
+    running: root.keyboardLayoutEnabled && root.keyboardLayoutAutoPoll
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: if (!kbLayoutProbe.running) kbLayoutProbe.running = true
+  }
+
+  property string _kbLayoutPrev: ""
+  Process {
+    id: kbLayoutProbe
+    running: false
+    command: ["sh", "-c",
+      "if command -v niri >/dev/null 2>&1; then " +
+      "  niri msg --json keyboard-layouts 2>/dev/null | sed -n 's/.*\"current_idx\":\\s*\\([0-9]*\\).*\"names\":\\s*\\[\\([^]]*\\)\\].*/\\1|\\2/p' | head -n1 | awk -F'|' '{ idx=$1; gsub(/\"/,\"\",$2); n=split($2, a, \",\"); for(i=1;i<=n;i++){gsub(/^ +| +$/,\"\",a[i])}; print a[idx+1] }'; " +
+      "elif command -v hyprctl >/dev/null 2>&1; then " +
+      "  hyprctl devices -j 2>/dev/null | sed -n 's/.*\"active_keymap\":\\s*\"\\([^\"]*\\)\".*/\\1/p' | head -n1; " +
+      "elif command -v setxkbmap >/dev/null 2>&1; then " +
+      "  setxkbmap -query 2>/dev/null | awk -F: '/layout/{gsub(\" \",\"\"); print $2; exit}'; " +
+      "fi"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        const line = (text || "").trim()
+        if (line.length === 0) return
+        if (line === root._kbLayoutPrev) return
+        const isFirst = root._kbLayoutPrev === ""
+        root._kbLayoutPrev = line
+        if (!isFirst && root.keyboardLayoutEnabled) root.keyboardShow(line)
+        else root.keyboardLayout = line
+      }
+    }
+    onExited: running = false
+  }
+
+  // ── Screenshot directory watcher ─────────────────────────
+  Timer {
+    id: shotWatcher
+    interval: Math.max(1500, root.screenshotPollSec * 1000)
+    running: root.screenshotEnabled && root.screenshotAutoWatch
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: if (!shotProbe.running) shotProbe.running = true
+  }
+
+  property string _shotPrev: ""
+  Process {
+    id: shotProbe
+    running: false
+    command: ["sh", "-c",
+      "dir=\"" + (root.screenshotDir.length > 0 ? root.screenshotDir : "$HOME/Pictures/Screenshots") + "\"; " +
+      "dir=$(eval echo \"$dir\"); " +
+      "[ -d \"$dir\" ] || exit 0; " +
+      "find \"$dir\" -maxdepth 1 -type f \\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \\) " +
+      "-printf '%T@ %p\\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        const line = (text || "").trim()
+        if (line.length === 0) return
+        if (line === root._shotPrev) return
+        const isFirst = root._shotPrev === ""
+        root._shotPrev = line
+        if (!isFirst && root.screenshotEnabled) root.screenshotShow(line)
+      }
+    }
+    onExited: running = false
+  }
+
+  // ── Notification arrival sound ───────────────────────────
+  Process {
+    id: notifSoundProcess
+    running: false
+    command: ["sh", "-c",
+      "p=\"" + root.notificationSoundPath + "\"; " +
+      "if [ -z \"$p\" ]; then p=\"/usr/share/sounds/freedesktop/stereo/message.oga\"; fi; " +
+      "[ -f \"$p\" ] || exit 0; " +
+      "if command -v paplay >/dev/null 2>&1; then paplay \"$p\"; " +
+      "elif command -v pw-play >/dev/null 2>&1; then pw-play \"$p\"; " +
+      "elif command -v aplay >/dev/null 2>&1; then aplay -q \"$p\"; fi"]
+    onExited: running = false
+  }
+  function playNotificationSound() {
+    if (!notificationSound) return
+    if (notifSoundProcess.running) return
+    notifSoundProcess.running = true
+  }
+
+  // ── Track-change flash signal (consumed by Island/MediaBubble) ──
+  signal trackChanged()
+  signal pomodoroPhaseAdvanced(string newPhase)
+  signal downloadFinished()
+
+  property string _prevMediaTitle: ""
+  Connections {
+    target: MediaService
+    function onTrackTitleChanged() {
+      const t = MediaService.trackTitle
+      if (t.length > 0 && t !== root._prevMediaTitle) {
+        root._prevMediaTitle = t
+        root.trackChanged()
+      }
+    }
+  }
+
+  // ── Battery time-remaining estimate ──────────────────────
+  // Derived from short-term level history.
+  property var _batteryHistory: []   // [{t: ms, lvl: int}]
+  property int batteryMinutesRemaining: -1
+
+  Connections {
+    target: root
+    function onBatteryLevelChanged() {
+      if (root.batteryLevel < 0) { root.batteryMinutesRemaining = -1; return }
+      const now = Date.now()
+      const h = root._batteryHistory.slice()
+      h.push({ t: now, lvl: root.batteryLevel })
+      // Keep last 10 minutes
+      const cutoff = now - 10 * 60 * 1000
+      while (h.length > 0 && h[0].t < cutoff) h.shift()
+      root._batteryHistory = h
+      if (h.length < 2) { root.batteryMinutesRemaining = -1; return }
+      const first = h[0]
+      const last = h[h.length - 1]
+      const dl = last.lvl - first.lvl
+      const dt = (last.t - first.t) / 60000.0   // minutes
+      if (dt < 0.5) { root.batteryMinutesRemaining = -1; return }
+      if (root.batteryState === "Charging") {
+        if (dl <= 0) { root.batteryMinutesRemaining = -1; return }
+        const remain = (100 - last.lvl) * dt / dl
+        root.batteryMinutesRemaining = Math.max(0, Math.round(remain))
+      } else if (root.batteryState === "Discharging") {
+        if (dl >= 0) { root.batteryMinutesRemaining = -1; return }
+        const remain = last.lvl * dt / (-dl)
+        root.batteryMinutesRemaining = Math.max(0, Math.round(remain))
+      } else {
+        root.batteryMinutesRemaining = -1
+      }
+    }
+  }
+
   // ── OSD (volume / brightness) ────────────────────────────
   property bool osdActive: false
   property string osdKind: "volume"
@@ -719,6 +1010,7 @@ Item {
       pomodoroRemainingSec = pomodoroPhaseTotalSec
     }
     root.peek()
+    root.pomodoroPhaseAdvanced(pomodoroPhase)
   }
 
   function pomodoroStart() {
@@ -806,7 +1098,13 @@ Item {
   Timer {
     id: downloadFinishTimer
     interval: 1500; repeat: false
-    onTriggered: { root.downloadShowing = false; root.downloadName = ""; root.downloadProgress = 0; root.downloadSpeedKb = 0 }
+    onTriggered: {
+      root.downloadShowing = false
+      root.downloadName = ""
+      root.downloadProgress = 0
+      root.downloadSpeedKb = 0
+      root.downloadFinished()
+    }
   }
 
   // ── CPU temp / load ──────────────────────────────────────

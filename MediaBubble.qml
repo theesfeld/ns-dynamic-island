@@ -26,11 +26,40 @@ Item {
     anchors.fill: parent
     spacing: 8
 
-    // Album art (rotates subtly when playing if iconMicroAnimations is on)
+    // Album art with track-change flash + flip
     Item {
+      id: artHolder
       Layout.preferredWidth: Math.max(18, parent.height - 8)
       Layout.preferredHeight: Math.max(18, parent.height - 8)
       Layout.alignment: Qt.AlignVCenter
+
+      property real flipAngle: 0
+
+      transform: Rotation {
+        origin.x: artHolder.width / 2
+        origin.y: artHolder.height / 2
+        axis { x: 0; y: 1; z: 0 }
+        angle: artHolder.flipAngle
+      }
+
+      Connections {
+        target: main
+        function onTrackChanged() {
+          if (!main.effectsTrackFlash) return
+          flipAnim.restart()
+          flashAnim.restart()
+        }
+      }
+      SequentialAnimation {
+        id: flipAnim
+        NumberAnimation { target: artHolder; property: "flipAngle"; from: 0; to: 90;  duration: 220; easing.type: Easing.InQuad }
+        NumberAnimation { target: artHolder; property: "flipAngle"; from: -90; to: 0;  duration: 220; easing.type: Easing.OutQuad }
+      }
+      SequentialAnimation {
+        id: flashAnim
+        NumberAnimation { target: flashOverlay; property: "opacity"; from: 0; to: 0.75; duration: 100 }
+        NumberAnimation { target: flashOverlay; property: "opacity"; to: 0; duration: 400; easing.type: Easing.OutQuad }
+      }
 
       Rectangle {
         anchors.fill: parent
@@ -47,6 +76,15 @@ Item {
           cache: true
           sourceSize.width: width * 2
           sourceSize.height: height * 2
+        }
+
+        // Track-change flash overlay
+        Rectangle {
+          id: flashOverlay
+          anchors.fill: parent
+          radius: parent.radius
+          color: "#FFFFFF"
+          opacity: 0
         }
 
         // Subtle dynamic-accent ring
@@ -67,6 +105,17 @@ Item {
           visible: main.mediaArtUrl.length === 0
         }
       }
+    }
+
+    // Audio level bars — visible when expanded AND playing
+    AudioBars {
+      visible: main.effectsAudioBars && root.expanded && main.mediaIsPlaying
+      Layout.alignment: Qt.AlignVCenter
+      Layout.preferredWidth: 14
+      tint: root.accent
+      playing: main.mediaIsPlaying
+      barCount: 4
+      maxHeight: 12
     }
 
     // Text + progress

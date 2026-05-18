@@ -266,7 +266,8 @@ PanelWindow {
       clip: true
 
       opacity: main.shouldShow ? 1 : 0
-      scale: main.shouldShow ? 1 : 0.92
+      // Hover lift implemented via scale (avoids fighting the verticalCenter anchor)
+      scale: (main.shouldShow ? 1 : 0.92) * (main.effectsHoverLift && main.hovered ? 1.04 : 1.0)
       transformOrigin: Item.Center
 
       Behavior on width  { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
@@ -323,6 +324,33 @@ PanelWindow {
         Behavior on opacity { NumberAnimation { duration: 180 } }
       }
 
+      // ── Click ripple + Confetti effects ────────────────
+      Ripple {
+        id: ripple
+        anchors.fill: parent
+        visible: main.effectsRipple
+        z: 5
+      }
+
+      Confetti {
+        id: confetti
+        anchors.fill: parent
+        visible: main.effectsConfetti
+        z: 6
+      }
+
+      Connections {
+        target: main
+        function onPomodoroPhaseAdvanced(newPhase) {
+          if (main.effectsConfetti && (newPhase === "break" || newPhase === "longBreak")) {
+            confetti.burst()
+          }
+        }
+        function onDownloadFinished() {
+          if (main.effectsConfetti) confetti.burst()
+        }
+      }
+
       // ── Pointer interactions: hover, click, swipe ──────
       MouseArea {
         id: pillArea
@@ -338,6 +366,7 @@ PanelWindow {
 
         onPressed: (mouse) => {
           pressX = mouse.x; pressY = mouse.y; dragging = false
+          if (main.effectsRipple) ripple.spawn(mouse.x, mouse.y)
         }
         onPositionChanged: (mouse) => {
           if (!pressed) return
