@@ -39,9 +39,7 @@ Item {
   readonly property bool dualBubble: cfg.dualBubble ?? def.dualBubble ?? true
   readonly property var disabledScreens: cfg.disabledScreens || def.disabledScreens || []
 
-  // ── Exposed state (read by Island.qml via pluginApi.mainInstance) ──
-
-  // Media (forwarded from MediaService so the UI binds to one source).
+  // ── Media (forwarded from MediaService) ──────────────────
   // `mediaActive` stays true while paused so the bubble doesn't vanish on pause.
   readonly property bool mediaActive: MediaService.trackTitle.length > 0
   readonly property bool mediaIsPlaying: MediaService.isPlaying
@@ -55,41 +53,40 @@ Item {
   readonly property bool mediaCanNext: MediaService.canGoNext
   readonly property bool mediaCanPrev: MediaService.canGoPrevious
 
-  // Notification peek (most recent, auto-cleared after notificationDurationSec)
+  // ── Notification peek (most recent) ──────────────────────
   property var activeNotification: null
   readonly property bool notificationActive: activeNotification !== null
 
-  // Screen recording
+  // ── Screen recording ─────────────────────────────────────
   property bool recordingActive: false
 
-  // Weather (populated by weatherTimer; unit-agnostic display strings)
+  // ── Weather (populated by weatherTimer) ──────────────────
   property string weatherTemp: ""
   property string weatherCondition: ""
+  property string weatherCode: ""
 
-  // Manual force-show / peek (IPC toggle)
+  // ── Manual force-show (IPC) ──────────────────────────────
   property bool forceShown: false
 
-  // Auto-hide control
+  // ── Visibility / expansion ───────────────────────────────
   readonly property bool anyBubbleActive: mediaActive || notificationActive || recordingActive
   readonly property bool idleVisible: idleShowClock || (idleShowWeather && weatherTemp.length > 0)
   readonly property bool shouldShow: enabled && (forceShown || anyBubbleActive || idleVisible)
 
-  // Expansion: any bubble being "interesting" expands; hover also expands
   property bool hovered: false
-  readonly property bool expanded: hovered || (mediaActive && !recordingActive) || (autoShowOnNotification && notificationActive)
+  // Expand when hovered, when media is the headline, or when a notification is peeking.
+  readonly property bool expanded: hovered
+    || (mediaActive && !recordingActive)
+    || (autoShowOnNotification && notificationActive)
 
   // ── Media change → optional auto-show poke ───────────────
   Connections {
     target: MediaService
     function onTrackTitleChanged() {
-      if (autoShowOnMedia && mediaTitle.length > 0) {
-        peek()
-      }
+      if (root.autoShowOnMedia && root.mediaTitle.length > 0) root.peek()
     }
     function onIsPlayingChanged() {
-      if (autoShowOnMedia && MediaService.isPlaying) {
-        peek()
-      }
+      if (root.autoShowOnMedia && MediaService.isPlaying) root.peek()
     }
   }
 
@@ -97,7 +94,7 @@ Item {
   Connections {
     target: NotificationService.popupModel
     function onCountChanged() {
-      if (!autoShowOnNotification) return
+      if (!root.autoShowOnNotification) return
       if (NotificationService.popupModel.count === 0) return
       const latest = NotificationService.popupModel.get(0)
       if (!latest) return
@@ -106,7 +103,7 @@ Item {
         body: latest.body || "",
         appName: latest.appName || "",
         image: latest.cachedImage || latest.originalImage || "",
-        urgency: latest.urgency || 1,
+        urgency: latest.urgency !== undefined ? latest.urgency : 1,
         timestamp: latest.timestamp || Date.now()
       }
       notificationClearTimer.restart()
@@ -115,7 +112,7 @@ Item {
 
   Timer {
     id: notificationClearTimer
-    interval: root.notificationDurationSec * 1000
+    interval: Math.max(1000, root.notificationDurationSec * 1000)
     repeat: false
     onTriggered: root.activeNotification = null
   }
@@ -123,17 +120,17 @@ Item {
   // ── Screen recording detection ───────────────────────────
   Timer {
     id: recordingPoller
-    interval: root.recordingPollSec * 1000
+    interval: Math.max(1000, root.recordingPollSec * 1000)
     running: root.detectScreenRecording
     repeat: true
     triggeredOnStart: true
-    onTriggered: recordingProbe.running = true
+    onTriggered: if (!recordingProbe.running) recordingProbe.running = true
   }
 
   Process {
     id: recordingProbe
     running: false
-    command: ["sh", "-c", "pgrep -x gpu-screen-recorder >/dev/null 2>&1 || pgrep -x wf-recorder >/dev/null 2>&1 || pgrep -x obs >/dev/null 2>&1"]
+    command: ["sh", "-c", "pgrep -x gpu-screen-recorder >/dev/null 2>&1 || pgrep -x wf-recorder >/dev/null 2>&1 || pgrep -x obs >/dev/null 2>&1 || pgrep -x kooha >/dev/null 2>&1"]
     onExited: function (exitCode) {
       root.recordingActive = (exitCode === 0)
       running = false
@@ -166,6 +163,7 @@ Item {
         if (!cur) return
         root.weatherTemp = (weatherUnits === "imperial" ? cur.temp_F + "°F" : cur.temp_C + "°C")
         root.weatherCondition = (cur.weatherDesc && cur.weatherDesc[0] && cur.weatherDesc[0].value) || ""
+        root.weatherCode = cur.weatherCode || ""
       } catch (e) {
         Logger.w("ns-dynamic-island", "Weather parse failed:", e)
       }
@@ -182,22 +180,29 @@ Item {
 
   Timer {
     id: peekTimer
-    interval: root.hideDelaySec * 1000
+    interval: Math.max(500, root.hideDelaySec * 1000)
     repeat: false
     onTriggered: root.forceShown = false
   }
 
-  // ── Media transport passthrough (called by MediaBubble) ──
+  // ── Media transport passthrough ──────────────────────────
   function mediaPlayPause() {
-    if (!MediaService.currentPlayer) return
-    if (MediaService.isPlaying) MediaService.currentPlayer.pause()
-    else MediaService.currentPlayer.play()
+    const p = MediaService.currentPlayer
+    if (!p) return
+    if (MediaService.isPlaying) p.pause()
+    else p.play()
   }
   function mediaNext() {
-    if (MediaService.currentPlayer && MediaService.canGoNext) MediaService.currentPlayer.next()
+    const p = MediaService.currentPlayer
+    if (p && MediaService.canGoNext) p.next()
   }
   function mediaPrevious() {
-    if (MediaService.currentPlayer && MediaService.canGoPrevious) MediaService.currentPlayer.previous()
+    const p = MediaService.currentPlayer
+    if (p && MediaService.canGoPrevious) p.previous()
+  }
+  function dismissNotification() {
+    root.activeNotification = null
+    notificationClearTimer.stop()
   }
 
   // ── IPC handler ──────────────────────────────────────────
@@ -225,7 +230,7 @@ Item {
   Variants {
     model: Quickshell.screens.filter(s => root.disabledScreens.indexOf(s.name) === -1)
 
-    Island {
+    delegate: Island {
       required property var modelData
       screen: modelData
       main: root
@@ -233,6 +238,8 @@ Item {
   }
 
   Component.onCompleted: {
-    Logger.i("ns-dynamic-island", "initialized on", CompositorService.isNiri ? "niri" : (CompositorService.isHyprland ? "hyprland" : "other"))
+    Logger.i("ns-dynamic-island", "initialized on",
+      CompositorService.isNiri ? "niri"
+        : (CompositorService.isHyprland ? "hyprland" : "other"))
   }
 }

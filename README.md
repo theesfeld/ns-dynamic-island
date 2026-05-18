@@ -16,7 +16,7 @@ Niri; any Wayland layer-shell compositor should work).
 - **Notification peek** — Pops the latest notification from Noctalia's own
   notification server, auto-hides after a configurable duration.
 - **Recording indicator** — Pulsing red `REC` pill while `gpu-screen-recorder`,
-  `wf-recorder`, or `obs` is running.
+  `wf-recorder`, `obs`, or `kooha` is running.
 - **Idle state** — Clock (optional weather via wttr.in).
 - **Dual bubbles** — Media + notification or media + recording can show
   side-by-side when `dualBubble` is enabled.
@@ -39,6 +39,13 @@ Then enable the plugin from Noctalia's settings UI. Hot reload:
 ```sh
 NOCTALIA_DEBUG=1 qs -c noctalia-shell
 ```
+
+## Mouse
+
+- **Left click** — toggle play/pause (or dismiss notification peek when no media).
+- **Middle click** — toggle play/pause (always).
+- **Right click** — dismiss notification peek.
+- **Hover** — expand to show artist + transport controls (and notification body).
 
 ## IPC
 

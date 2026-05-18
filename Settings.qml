@@ -198,7 +198,7 @@ ColumnLayout {
     description: "Leave empty for wttr.in auto-detection by IP."
     placeholderText: "e.g. London, 10001, or empty"
     text: root.editWeatherLocation
-    onTextChanged: root.editWeatherLocation = text
+    onEditingFinished: root.editWeatherLocation = text
     visible: root.editIdleWeather
   }
 
