@@ -31,17 +31,32 @@ PanelWindow {
 
   implicitHeight: main.islandHeight + 36
 
-  // Input mask: only the pill (plus the open context menu) accept pointer
-  // events; the rest of the panel surface passes clicks through to the
-  // bar beneath. Without this, the layer-shell surface ends up either
-  // swallowing clicks across the full screen width or accepting none at
-  // all (compositor-dependent) — either way the user can't interact
-  // with the pill.
+  // Input mask. The panel surface spans the full screen width, so without
+  // an explicit input region the compositor sends every click anywhere
+  // along the top of the screen to us — that's why the bar/browser become
+  // unclickable. We use explicit x/y/w/h rect bindings (the item: form is
+  // unreliable across Quickshell versions).
+  //
+  // Default mode is click-through (overlayInteractive=false): mask width
+  // and height are 0, so the wlr-layer-shell surface accepts no input and
+  // every click falls to the bar beneath. The pill is purely visual and
+  // the bar widget handles interaction.
+  //
+  // When overlayInteractive=true, the mask tracks the pill's geometry and
+  // only that rect accepts input. The context menu is also unioned in
+  // when it's open.
   mask: Region {
-    item: pill
+    x: main.overlayInteractive ? Math.max(0, pill.x) : 0
+    y: main.overlayInteractive ? Math.max(0, pill.y) : 0
+    width:  main.overlayInteractive ? pill.width  : 0
+    height: main.overlayInteractive ? pill.height : 0
+
     Region {
-      item: ctxMenu
       intersection: Intersection.Combine
+      x: (main.overlayInteractive && ctxMenu.visible) ? Math.max(0, ctxMenu.x) : 0
+      y: (main.overlayInteractive && ctxMenu.visible) ? Math.max(0, ctxMenu.y) : 0
+      width:  (main.overlayInteractive && ctxMenu.visible) ? ctxMenu.width  : 0
+      height: (main.overlayInteractive && ctxMenu.visible) ? ctxMenu.height : 0
     }
   }
 

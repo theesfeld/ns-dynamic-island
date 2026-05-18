@@ -14,6 +14,8 @@ ColumnLayout {
   // ── Edit-state mirrors of every setting ─────────────────
   // Core
   property bool   editEnabled:            cfg.enabled ?? def.enabled ?? true
+  property bool   editOverlayEnabled:     cfg.overlayEnabled ?? def.overlayEnabled ?? true
+  property bool   editOverlayInteractive: cfg.overlayInteractive ?? def.overlayInteractive ?? false
   property string editPosition:           cfg.position || def.position || "top"
   property int    editMargin:             cfg.marginPx ?? def.marginPx ?? 6
   property int    editHorizontalOffset:   cfg.horizontalOffset ?? def.horizontalOffset ?? 0
@@ -199,6 +201,29 @@ ColumnLayout {
     description: "Master switch. When disabled, the island is never shown."
     checked: root.editEnabled
     onToggled: checked => root.editEnabled = checked
+  }
+
+  NDivider { Layout.fillWidth: true }
+
+  // ════════ Floating overlay ════════
+  NLabel {
+    label: "Floating overlay"
+    description: "The pill is rendered on a wlr-layer-shell window above your bar."
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Show floating overlay"
+    description: "When off, only the bar widget is used (no layer-shell window)."
+    checked: root.editOverlayEnabled
+    onToggled: checked => root.editOverlayEnabled = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Overlay accepts clicks"
+    description: "Off by default — the pill is visible but every click passes through to your bar/browser. Turn on only if you want to click the pill directly AND your compositor honors our input-region mask correctly. If toggling this on makes your bar unclickable, turn it back off."
+    visible: root.editOverlayEnabled
+    checked: root.editOverlayInteractive
+    onToggled: checked => root.editOverlayInteractive = checked
   }
 
   NDivider { Layout.fillWidth: true }
@@ -1240,6 +1265,8 @@ ColumnLayout {
 
     // Core
     s.enabled = root.editEnabled
+    s.overlayEnabled = root.editOverlayEnabled
+    s.overlayInteractive = root.editOverlayInteractive
     s.position = root.editPosition
     s.marginPx = root.editMargin
     s.horizontalOffset = root.editHorizontalOffset

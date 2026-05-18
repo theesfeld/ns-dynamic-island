@@ -19,6 +19,16 @@ Item {
 
   // Core
   readonly property bool enabled: cfg.enabled ?? def.enabled ?? true
+  // The floating overlay window. When false, no PanelWindow is created;
+  // only the bar widget is used.
+  readonly property bool overlayEnabled: cfg.overlayEnabled ?? def.overlayEnabled ?? true
+  // Whether the floating overlay accepts pointer input. Default is FALSE:
+  // the pill is visible but every click passes through to whatever's
+  // beneath (bar, desktop, browser). This avoids the layer-shell surface
+  // stealing clicks across the full screen width. Set true only if you
+  // want to click the pill directly AND your compositor honors our
+  // input-region mask correctly.
+  readonly property bool overlayInteractive: cfg.overlayInteractive ?? def.overlayInteractive ?? false
   readonly property string position: cfg.position || def.position || "top"
   readonly property int marginPx: cfg.marginPx ?? def.marginPx ?? 6
   readonly property int horizontalOffset: cfg.horizontalOffset ?? def.horizontalOffset ?? 0
@@ -1564,8 +1574,13 @@ Item {
   }
 
   // ── Multi-monitor floating island windows ────────────────
+  // Only instantiated when overlayEnabled is true. When false, the plugin
+  // is used purely as a bar widget — no floating panel, no input region
+  // concerns, no chance of stealing clicks.
   Variants {
-    model: Quickshell.screens.filter(s => root.disabledScreens.indexOf(s.name) === -1)
+    model: root.overlayEnabled
+      ? Quickshell.screens.filter(s => root.disabledScreens.indexOf(s.name) === -1)
+      : []
 
     delegate: Island {
       required property var modelData
