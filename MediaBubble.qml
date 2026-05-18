@@ -240,6 +240,16 @@ Item {
         enabled: main.mediaCanNext
         onClicked: main.mediaNext()
       }
+      // Player switcher (when multiple MPRIS players are running)
+      NIconButton {
+        visible: main.availablePlayers && main.availablePlayers.length > 1
+        icon: "swap"
+        property int cursor: 0
+        onClicked: {
+          cursor = (cursor + 1) % main.availablePlayers.length
+          main.switchToPlayer(cursor)
+        }
+      }
     }
   }
 }

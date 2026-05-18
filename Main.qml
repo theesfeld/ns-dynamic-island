@@ -140,6 +140,38 @@ Item {
   readonly property bool effectsAudioBars: cfg.effectsAudioBars ?? def.effectsAudioBars ?? true
   readonly property bool effectsConfetti: cfg.effectsConfetti ?? def.effectsConfetti ?? true
   readonly property bool effectsNotificationSlide: cfg.effectsNotificationSlide ?? def.effectsNotificationSlide ?? true
+  readonly property bool effectsWeatherParticles: cfg.effectsWeatherParticles ?? def.effectsWeatherParticles ?? true
+  readonly property bool reducedMotion: cfg.reducedMotion ?? def.reducedMotion ?? false
+  readonly property bool realBlur: cfg.realBlur ?? def.realBlur ?? false
+  readonly property real realBlurRadius: cfg.realBlurRadius ?? def.realBlurRadius ?? 18
+
+  // Scroll-to-adjust on the pill
+  readonly property bool scrollAdjustsVolume: cfg.scrollAdjustsVolume ?? def.scrollAdjustsVolume ?? true
+  readonly property int  scrollVolumeStep: cfg.scrollVolumeStep ?? def.scrollVolumeStep ?? 5
+
+  // Auto-DND on fullscreen
+  readonly property bool autoDndOnFullscreen: cfg.autoDndOnFullscreen ?? def.autoDndOnFullscreen ?? false
+  readonly property int  fullscreenPollSec: cfg.fullscreenPollSec ?? def.fullscreenPollSec ?? 4
+
+  // Disk warning
+  readonly property bool diskEnabled: cfg.diskEnabled ?? def.diskEnabled ?? false
+  readonly property int  diskWarnThreshold: cfg.diskWarnThreshold ?? def.diskWarnThreshold ?? 90
+  readonly property int  diskPollSec: cfg.diskPollSec ?? def.diskPollSec ?? 60
+  readonly property string diskMount: cfg.diskMount || def.diskMount || "/"
+
+  // Network throughput
+  readonly property bool netSpeedEnabled: cfg.netSpeedEnabled ?? def.netSpeedEnabled ?? false
+  readonly property int  netSpeedPollSec: cfg.netSpeedPollSec ?? def.netSpeedPollSec ?? 2
+
+  // RAM
+  readonly property bool ramEnabled: cfg.ramEnabled ?? def.ramEnabled ?? false
+  readonly property int  ramWarnThreshold: cfg.ramWarnThreshold ?? def.ramWarnThreshold ?? 85
+
+  // Pomodoro stats persistence
+  readonly property bool pomodoroStatsEnabled: cfg.pomodoroStatsEnabled ?? def.pomodoroStatsEnabled ?? true
+
+  // Idle next-event countdown
+  readonly property bool idleNextEventCountdown: cfg.idleNextEventCountdown ?? def.idleNextEventCountdown ?? true
 
   // Clipboard / Screenshot
   readonly property bool clipboardEnabled: cfg.clipboardEnabled ?? def.clipboardEnabled ?? false
@@ -1152,12 +1184,257 @@ Item {
   }
   Timer { id: cpuPeekTimer; interval: 5000; repeat: false; onTriggered: root.cpuPeek = false }
 
-  // ── DND state (auto from Pomodoro if requested) ──────────
-  readonly property bool dndActive: dndEnabled || (pomodoroAutoDnd && pomodoroPhase === "work")
+  // ── Network throughput ───────────────────────────────────
+  property int netRxKb: 0
+  property int netTxKb: 0
+  property real _netLastRx: 0
+  property real _netLastTx: 0
+  property real _netLastT: 0
+
+  Timer {
+    id: netSpeedPoller
+    interval: Math.max(1000, root.netSpeedPollSec * 1000)
+    running: root.netSpeedEnabled
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: if (!netSpeedProbe.running) netSpeedProbe.running = true
+  }
+
+  Process {
+    id: netSpeedProbe
+    running: false
+    command: ["sh", "-c",
+      "rx=0; tx=0; for d in /sys/class/net/*/; do n=$(basename \"$d\"); " +
+      "  case \"$n\" in lo|docker*|virbr*|veth*|br-*) continue;; esac; " +
+      "  r=$(cat \"$d\"statistics/rx_bytes 2>/dev/null || echo 0); " +
+      "  t=$(cat \"$d\"statistics/tx_bytes 2>/dev/null || echo 0); " +
+      "  rx=$((rx + r)); tx=$((tx + t)); " +
+      "done; echo \"$rx|$tx\""]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        const line = (text || "").trim()
+        if (line.length === 0) return
+        const parts = line.split("|")
+        const rx = parseFloat(parts[0]) || 0
+        const tx = parseFloat(parts[1]) || 0
+        const now = Date.now()
+        if (root._netLastT > 0) {
+          const dt = (now - root._netLastT) / 1000.0
+          if (dt > 0.1) {
+            root.netRxKb = Math.max(0, Math.round((rx - root._netLastRx) / 1024.0 / dt))
+            root.netTxKb = Math.max(0, Math.round((tx - root._netLastTx) / 1024.0 / dt))
+          }
+        }
+        root._netLastRx = rx
+        root._netLastTx = tx
+        root._netLastT = now
+      }
+    }
+    onExited: running = false
+  }
+
+  // ── Disk warning ─────────────────────────────────────────
+  property int diskUsagePct: 0
+  property string diskUsageMount: "/"
+  property bool diskPeek: false
+  readonly property bool diskActive: diskEnabled && diskUsagePct >= diskWarnThreshold
+
+  Timer {
+    id: diskPoller
+    interval: Math.max(15000, root.diskPollSec * 1000)
+    running: root.diskEnabled
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: if (!diskProbe.running) diskProbe.running = true
+  }
+
+  Process {
+    id: diskProbe
+    running: false
+    command: ["sh", "-c",
+      "df -P \"" + root.diskMount + "\" 2>/dev/null | awk 'NR==2{gsub(\"%\",\"\",$5); print $5\"|\"$6}'"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        const line = (text || "").trim()
+        if (line.length === 0) return
+        const parts = line.split("|")
+        root.diskUsagePct = parseInt(parts[0]) || 0
+        root.diskUsageMount = parts[1] || "/"
+      }
+    }
+    onExited: running = false
+  }
+
+  // ── RAM pressure ─────────────────────────────────────────
+  property int ramUsedPct: 0
+
+  Timer {
+    id: ramPoller
+    interval: 5000
+    running: root.ramEnabled || root.cpuEnabled
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: if (!ramProbe.running) ramProbe.running = true
+  }
+
+  Process {
+    id: ramProbe
+    running: false
+    command: ["sh", "-c",
+      "awk '/MemTotal/ {t=$2} /MemAvailable/ {a=$2} END{ if (t > 0) printf \"%d\\n\", (1-a/t)*100 }' /proc/meminfo 2>/dev/null"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        const v = parseInt((text || "").trim()) || 0
+        root.ramUsedPct = v
+      }
+    }
+    onExited: running = false
+  }
+
+  // ── CPU sparkline history ────────────────────────────────
+  property var cpuHistory: []
+  onCpuLoadPctChanged: {
+    if (!cpuEnabled) return
+    const h = cpuHistory.slice()
+    h.push(cpuLoadPct)
+    while (h.length > 30) h.shift()
+    cpuHistory = h
+  }
+
+  // ── Auto-DND on fullscreen ───────────────────────────────
+  property bool fullscreenDetected: false
+
+  Timer {
+    id: fullscreenPoller
+    interval: Math.max(2000, root.fullscreenPollSec * 1000)
+    running: root.autoDndOnFullscreen
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: if (!fullscreenProbe.running) fullscreenProbe.running = true
+  }
+
+  Process {
+    id: fullscreenProbe
+    running: false
+    command: ["sh", "-c",
+      "if command -v niri >/dev/null 2>&1; then " +
+      "  niri msg --json focused-window 2>/dev/null | grep -q '\"is_fullscreen\":\\s*true' && echo 1 || echo 0; " +
+      "elif command -v hyprctl >/dev/null 2>&1; then " +
+      "  hyprctl activewindow -j 2>/dev/null | grep -q '\"fullscreen\":\\s*[12]' && echo 1 || echo 0; " +
+      "else echo 0; fi"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        const v = (text || "").trim()
+        root.fullscreenDetected = (v === "1")
+      }
+    }
+    onExited: running = false
+  }
+
+  // ── Pomodoro daily stats ─────────────────────────────────
+  property int pomodoroTodayCycles: 0
+  property int pomodoroTodayFocusMin: 0
+  property string _pomodoroStatsDate: ""
+
+  function _todayString() {
+    const d = new Date()
+    return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate()
+  }
+
+  Component.onCompleted: {
+    // Roll-over stats if it's a new day
+    if (root.pomodoroStatsEnabled) {
+      const today = root._todayString()
+      const savedDate = root.cfg.pomodoroStatsDate || ""
+      if (savedDate === today) {
+        root.pomodoroTodayCycles = root.cfg.pomodoroTodayCycles || 0
+        root.pomodoroTodayFocusMin = root.cfg.pomodoroTodayFocusMin || 0
+      } else {
+        root.pomodoroTodayCycles = 0
+        root.pomodoroTodayFocusMin = 0
+      }
+      root._pomodoroStatsDate = today
+    }
+  }
+
+  function _persistPomodoroStats() {
+    if (!root.pomodoroStatsEnabled || !root.pluginApi) return
+    const s = root.pluginApi.pluginSettings
+    s.pomodoroTodayCycles = root.pomodoroTodayCycles
+    s.pomodoroTodayFocusMin = root.pomodoroTodayFocusMin
+    s.pomodoroStatsDate = root._todayString()
+    root.pluginApi.saveSettings()
+  }
+
+  Connections {
+    target: root
+    function onPomodoroPhaseAdvanced(newPhase) {
+      if (!root.pomodoroStatsEnabled) return
+      // A "work → break" transition means a cycle just completed
+      if (newPhase === "break" || newPhase === "longBreak") {
+        root.pomodoroTodayCycles += 1
+        root.pomodoroTodayFocusMin += root.pomodoroWorkMin
+        root._persistPomodoroStats()
+      }
+    }
+  }
+
+  // ── MPRIS player list (for switcher) ─────────────────────
+  readonly property var availablePlayers:
+    MediaService.players !== undefined ? MediaService.players
+    : (MediaService.allPlayers !== undefined ? MediaService.allPlayers : [])
+
+  function switchToPlayer(idx) {
+    if (typeof MediaService.setCurrentPlayer === "function") {
+      const p = availablePlayers[idx]
+      if (p) MediaService.setCurrentPlayer(p)
+    } else if (typeof MediaService.currentPlayerIndex !== "undefined") {
+      MediaService.currentPlayerIndex = idx
+    }
+  }
+
+  // ── Scroll-to-adjust volume ──────────────────────────────
+  // Triggers an external wpctl/pactl command; the autopoller picks the
+  // new value up and shows the OSD.
+  function adjustVolume(delta) {
+    const step = Math.max(1, Math.min(20, delta | 0))
+    volumeAdjustProcess.command = ["sh", "-c",
+      "if command -v wpctl >/dev/null 2>&1; then wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ " +
+      (delta > 0 ? step : -step) + "%+; " +
+      "elif command -v pactl >/dev/null 2>&1; then pactl set-sink-volume @DEFAULT_SINK@ " +
+      (delta > 0 ? ("+" + step) : ("-" + step)) + "%; fi"]
+    volumeAdjustProcess.running = true
+  }
+
+  Process {
+    id: volumeAdjustProcess
+    running: false
+    command: ["sh", "-c", "true"]
+    onExited: running = false
+  }
+
+  // ── DND state (auto from Pomodoro / fullscreen if requested) ─
+  readonly property bool dndActive: dndEnabled
+    || (pomodoroAutoDnd && pomodoroPhase === "work")
+    || (autoDndOnFullscreen && fullscreenDetected)
   readonly property bool focusBubbleActive: dndActive && hovered
 
   // ── Force-show (IPC) ─────────────────────────────────────
   property bool forceShown: false
+
+  // ── Idle calendar countdown ──────────────────────────────
+  // Returns minutes until calendarNextWhen (best-effort HH:MM parser).
+  readonly property int calendarMinutesUntil: {
+    if (!idleNextEventCountdown || calendarNextWhen.length === 0) return -1
+    const m = calendarNextWhen.match(/(\d{1,2}):(\d{2})/)
+    if (!m) return -1
+    const now = new Date()
+    const target = new Date(now)
+    target.setHours(parseInt(m[1]), parseInt(m[2]), 0, 0)
+    let mins = Math.round((target - now) / 60000)
+    if (mins < -30) mins += 24 * 60   // wrapped past midnight, treat as tomorrow
+    return mins
+  }
 
   // ── Visibility / expansion ───────────────────────────────
   readonly property bool anyBubbleActive:
@@ -1176,6 +1453,7 @@ Item {
    || screenshotActive
    || downloadActive
    || cpuActive
+   || diskActive
    || focusBubbleActive
 
   readonly property bool idleVisible: idleShowClock || (idleShowWeather && weatherTemp.length > 0)

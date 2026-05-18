@@ -70,9 +70,15 @@ Item {
       NText {
         Layout.fillWidth: true
         visible: root.expanded
-        text: root.isWork
-          ? "Focus — cycle " + main.pomodoroCycleCount
-          : (root.phase === "longBreak" ? "Long break" : "Short break")
+        text: {
+          const base = root.isWork
+            ? "Focus — cycle " + main.pomodoroCycleCount
+            : (root.phase === "longBreak" ? "Long break" : "Short break")
+          if (main.pomodoroStatsEnabled && main.pomodoroTodayCycles > 0) {
+            return base + " · " + main.pomodoroTodayCycles + " today (" + main.pomodoroTodayFocusMin + "m)"
+          }
+          return base
+        }
         color: Color.mOnSurfaceVariant
         pointSize: Style.fontSizeXS
         elide: Text.ElideRight

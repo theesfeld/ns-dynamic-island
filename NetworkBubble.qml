@@ -67,9 +67,15 @@ Item {
       NText {
         Layout.fillWidth: true
         visible: root.expanded
-        text: root.vpn ? "VPN active"
-            : root.state === "wifi" ? (root.signal + "% signal")
-            : root.state
+        text: {
+          const parts = []
+          if (root.vpn) parts.push("VPN")
+          if (root.state === "wifi") parts.push(root.signal + "% signal")
+          if (main.netSpeedEnabled && (main.netRxKb > 0 || main.netTxKb > 0)) {
+            parts.push("↓" + main.netRxKb + " ↑" + main.netTxKb + " KB/s")
+          }
+          return parts.length > 0 ? parts.join(" · ") : root.state
+        }
         color: Color.mOnSurfaceVariant
         pointSize: Style.fontSizeXS
         elide: Text.ElideRight

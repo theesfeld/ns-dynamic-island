@@ -24,6 +24,13 @@ Item {
     onTriggered: root.clockText = root.formatNow()
   }
 
+  function weatherParticleMode(condition) {
+    const c = (condition || "").toLowerCase()
+    if (c.indexOf("snow") !== -1 || c.indexOf("sleet") !== -1) return "snow"
+    if (c.indexOf("rain") !== -1 || c.indexOf("drizzle") !== -1 || c.indexOf("shower") !== -1) return "rain"
+    return "none"
+  }
+
   function weatherIconFor(condition) {
     const c = (condition || "").toLowerCase()
     if (c.indexOf("thunder") !== -1) return "weather-storm"
@@ -35,6 +42,13 @@ Item {
     return "weather-sun"
   }
 
+  // Weather particles overlay
+  WeatherParticles {
+    anchors.fill: parent
+    visible: main.effectsWeatherParticles && main.idleShowWeather
+    mode: visible ? root.weatherParticleMode(main.weatherCondition) : "none"
+  }
+
   RowLayout {
     anchors.centerIn: parent
     spacing: 8
@@ -44,6 +58,19 @@ Item {
       text: root.clockText
       color: main.themeOnSurface
       pointSize: Style.fontSizeS * main.textScale
+      font.weight: Font.Medium
+    }
+
+    // Calendar countdown ("in 5m") shown when next event is soon
+    NText {
+      visible: main.calendarEnabled && main.idleNextEventCountdown
+        && main.calendarMinutesUntil >= 0 && main.calendarMinutesUntil <= 30
+      text: "· " + main.calendarNextTitle + " in "
+        + (main.calendarMinutesUntil <= 0 ? "now"
+           : main.calendarMinutesUntil < 60 ? (main.calendarMinutesUntil + "m")
+           : (Math.floor(main.calendarMinutesUntil / 60) + "h"))
+      color: Color.mPrimary
+      pointSize: Style.fontSizeXS * main.textScale
       font.weight: Font.Medium
     }
 

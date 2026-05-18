@@ -157,6 +157,38 @@ ColumnLayout {
   property bool   editEffectsAudioBars:         cfg.effectsAudioBars ?? def.effectsAudioBars ?? true
   property bool   editEffectsConfetti:          cfg.effectsConfetti ?? def.effectsConfetti ?? true
   property bool   editEffectsNotificationSlide: cfg.effectsNotificationSlide ?? def.effectsNotificationSlide ?? true
+  property bool   editEffectsWeatherParticles:  cfg.effectsWeatherParticles ?? def.effectsWeatherParticles ?? true
+  property bool   editReducedMotion:            cfg.reducedMotion ?? def.reducedMotion ?? false
+  property bool   editRealBlur:                 cfg.realBlur ?? def.realBlur ?? false
+  property real   editRealBlurRadius:           cfg.realBlurRadius ?? def.realBlurRadius ?? 18
+
+  // Interaction additions
+  property bool   editScrollAdjustsVolume: cfg.scrollAdjustsVolume ?? def.scrollAdjustsVolume ?? true
+  property int    editScrollVolumeStep:    cfg.scrollVolumeStep ?? def.scrollVolumeStep ?? 5
+
+  // Auto-DND on fullscreen
+  property bool   editAutoDndOnFullscreen: cfg.autoDndOnFullscreen ?? def.autoDndOnFullscreen ?? false
+  property int    editFullscreenPollSec:   cfg.fullscreenPollSec ?? def.fullscreenPollSec ?? 4
+
+  // Disk
+  property bool   editDiskEnabled:       cfg.diskEnabled ?? def.diskEnabled ?? false
+  property int    editDiskWarnThreshold: cfg.diskWarnThreshold ?? def.diskWarnThreshold ?? 90
+  property int    editDiskPollSec:       cfg.diskPollSec ?? def.diskPollSec ?? 60
+  property string editDiskMount:         cfg.diskMount || def.diskMount || "/"
+
+  // Network speed
+  property bool   editNetSpeedEnabled: cfg.netSpeedEnabled ?? def.netSpeedEnabled ?? false
+  property int    editNetSpeedPollSec: cfg.netSpeedPollSec ?? def.netSpeedPollSec ?? 2
+
+  // RAM
+  property bool   editRamEnabled:       cfg.ramEnabled ?? def.ramEnabled ?? false
+  property int    editRamWarnThreshold: cfg.ramWarnThreshold ?? def.ramWarnThreshold ?? 85
+
+  // Pomodoro stats
+  property bool   editPomodoroStatsEnabled: cfg.pomodoroStatsEnabled ?? def.pomodoroStatsEnabled ?? true
+
+  // Idle countdown
+  property bool   editIdleNextEventCountdown: cfg.idleNextEventCountdown ?? def.idleNextEventCountdown ?? true
 
   spacing: Style.marginL
 
@@ -896,6 +928,143 @@ ColumnLayout {
     checked: root.editEffectsNotificationSlide
     onToggled: checked => root.editEffectsNotificationSlide = checked
   }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Weather particles"
+    description: "Rain / snow flakes drift over the idle pill in matching weather."
+    checked: root.editEffectsWeatherParticles
+    onToggled: checked => root.editEffectsWeatherParticles = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Real Gaussian blur"
+    description: "Uses Qt6 MultiEffect. Falls back to faux-blur if unavailable. Heavier on GPU."
+    checked: root.editRealBlur
+    onToggled: checked => root.editRealBlur = checked
+  }
+  NLabel { label: "Blur radius: " + Math.round(root.editRealBlurRadius); visible: root.editRealBlur }
+  NSlider {
+    Layout.fillWidth: true
+    from: 4; to: 48; stepSize: 1
+    visible: root.editRealBlur
+    value: root.editRealBlurRadius
+    onValueChanged: root.editRealBlurRadius = value
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Reduced motion"
+    description: "Disables most animations for accessibility / focus."
+    checked: root.editReducedMotion
+    onToggled: checked => root.editReducedMotion = checked
+  }
+
+  NDivider { Layout.fillWidth: true }
+
+  // ════════ Disk / RAM / Net throughput ════════
+  NLabel { label: "System monitors" }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Disk usage warning bubble"
+    description: "Peeks when the watched mount crosses the warning threshold."
+    checked: root.editDiskEnabled
+    onToggled: checked => root.editDiskEnabled = checked
+  }
+  NTextInput {
+    Layout.fillWidth: true
+    label: "Watched mount"
+    placeholderText: "/"
+    visible: root.editDiskEnabled
+    text: root.editDiskMount
+    onEditingFinished: root.editDiskMount = text
+  }
+  NLabel { label: "Disk warn threshold (%): " + root.editDiskWarnThreshold; visible: root.editDiskEnabled }
+  NSlider {
+    Layout.fillWidth: true
+    from: 70; to: 99; stepSize: 1
+    visible: root.editDiskEnabled
+    value: root.editDiskWarnThreshold
+    onValueChanged: root.editDiskWarnThreshold = value
+  }
+  NLabel { label: "Disk poll (s): " + root.editDiskPollSec; visible: root.editDiskEnabled }
+  NSlider {
+    Layout.fillWidth: true
+    from: 15; to: 600; stepSize: 5
+    visible: root.editDiskEnabled
+    value: root.editDiskPollSec
+    onValueChanged: root.editDiskPollSec = value
+  }
+
+  NToggle {
+    Layout.fillWidth: true
+    label: "Network throughput"
+    description: "Shows ↓/↑ KB/s in the network bubble."
+    checked: root.editNetSpeedEnabled
+    onToggled: checked => root.editNetSpeedEnabled = checked
+  }
+  NLabel { label: "Network speed poll (s): " + root.editNetSpeedPollSec; visible: root.editNetSpeedEnabled }
+  NSlider {
+    Layout.fillWidth: true
+    from: 1; to: 10; stepSize: 1
+    visible: root.editNetSpeedEnabled
+    value: root.editNetSpeedPollSec
+    onValueChanged: root.editNetSpeedPollSec = value
+  }
+
+  NToggle {
+    Layout.fillWidth: true
+    label: "Show RAM in CPU bubble"
+    checked: root.editRamEnabled
+    onToggled: checked => root.editRamEnabled = checked
+  }
+
+  NDivider { Layout.fillWidth: true }
+
+  // ════════ Quality-of-life ════════
+  NLabel { label: "Quality of life" }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Scroll wheel adjusts volume"
+    description: "Hover the pill and scroll to nudge the system volume."
+    checked: root.editScrollAdjustsVolume
+    onToggled: checked => root.editScrollAdjustsVolume = checked
+  }
+  NLabel { label: "Volume scroll step (%): " + root.editScrollVolumeStep; visible: root.editScrollAdjustsVolume }
+  NSlider {
+    Layout.fillWidth: true
+    from: 1; to: 20; stepSize: 1
+    visible: root.editScrollAdjustsVolume
+    value: root.editScrollVolumeStep
+    onValueChanged: root.editScrollVolumeStep = value
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Auto-DND when an app is fullscreen"
+    description: "Niri / Hyprland only. Checks active window state."
+    checked: root.editAutoDndOnFullscreen
+    onToggled: checked => root.editAutoDndOnFullscreen = checked
+  }
+  NLabel { label: "Fullscreen poll (s): " + root.editFullscreenPollSec; visible: root.editAutoDndOnFullscreen }
+  NSlider {
+    Layout.fillWidth: true
+    from: 2; to: 15; stepSize: 1
+    visible: root.editAutoDndOnFullscreen
+    value: root.editFullscreenPollSec
+    onValueChanged: root.editFullscreenPollSec = value
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Pomodoro daily stats"
+    description: "Tracks completed cycles + focus minutes, resets at midnight."
+    checked: root.editPomodoroStatsEnabled
+    onToggled: checked => root.editPomodoroStatsEnabled = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Idle next-event countdown"
+    description: "Inline countdown when a calendar event is within 30 minutes."
+    checked: root.editIdleNextEventCountdown
+    onToggled: checked => root.editIdleNextEventCountdown = checked
+  }
 
   NDivider { Layout.fillWidth: true }
 
@@ -1214,6 +1383,30 @@ ColumnLayout {
     s.effectsAudioBars = root.editEffectsAudioBars
     s.effectsConfetti = root.editEffectsConfetti
     s.effectsNotificationSlide = root.editEffectsNotificationSlide
+    s.effectsWeatherParticles = root.editEffectsWeatherParticles
+    s.reducedMotion = root.editReducedMotion
+    s.realBlur = root.editRealBlur
+    s.realBlurRadius = root.editRealBlurRadius
+
+    // Interaction extras
+    s.scrollAdjustsVolume = root.editScrollAdjustsVolume
+    s.scrollVolumeStep = root.editScrollVolumeStep
+    s.autoDndOnFullscreen = root.editAutoDndOnFullscreen
+    s.fullscreenPollSec = root.editFullscreenPollSec
+
+    // Disk / Net / RAM
+    s.diskEnabled = root.editDiskEnabled
+    s.diskWarnThreshold = root.editDiskWarnThreshold
+    s.diskPollSec = root.editDiskPollSec
+    s.diskMount = root.editDiskMount
+    s.netSpeedEnabled = root.editNetSpeedEnabled
+    s.netSpeedPollSec = root.editNetSpeedPollSec
+    s.ramEnabled = root.editRamEnabled
+    s.ramWarnThreshold = root.editRamWarnThreshold
+
+    // Pomodoro stats / idle countdown
+    s.pomodoroStatsEnabled = root.editPomodoroStatsEnabled
+    s.idleNextEventCountdown = root.editIdleNextEventCountdown
 
     pluginApi.saveSettings()
   }

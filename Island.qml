@@ -237,6 +237,7 @@ PanelWindow {
         if (main.screenshotActive)   arr.push(main.expanded ? 240 : 140)
         if (main.downloadActive)     arr.push(main.expanded ? 240 : 150)
         if (main.cpuActive)          arr.push(main.expanded ? 200 : 130)
+        if (main.diskActive)         arr.push(main.expanded ? 200 : 130)
         if (main.focusBubbleActive)  arr.push(main.expanded ? 200 : 130)
         if (main.calendarActive)     arr.push(main.expanded ? 220 : 140)
         if (arr.length === 0)        arr.push(main.compactWidth)
@@ -270,12 +271,12 @@ PanelWindow {
       scale: (main.shouldShow ? 1 : 0.92) * (main.effectsHoverLift && main.hovered ? 1.04 : 1.0)
       transformOrigin: Item.Center
 
-      Behavior on width  { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-      Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-      Behavior on opacity{ NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+      Behavior on width  { NumberAnimation { duration: main.reducedMotion ? 0 : 260; easing.type: Easing.OutCubic } }
+      Behavior on height { NumberAnimation { duration: main.reducedMotion ? 0 : 220; easing.type: Easing.OutCubic } }
+      Behavior on opacity{ NumberAnimation { duration: main.reducedMotion ? 0 : 180; easing.type: Easing.OutQuad } }
       Behavior on scale  {
         NumberAnimation {
-          duration: main.springExpand ? 320 : 220
+          duration: main.reducedMotion ? 0 : (main.springExpand ? 320 : 220)
           easing.type: main.springExpand ? Easing.OutBack : Easing.OutBack
           easing.overshoot: main.springExpand ? 1.6 : 1.2
         }
@@ -288,6 +289,22 @@ PanelWindow {
         visible: main.timeOfDayTint && !main.anyBubbleActive
         color: islandWindow.todTint
         z: 0
+      }
+
+      // Real Gaussian blur backdrop (Qt6 MultiEffect). Loaded via Loader
+      // so a missing QtQuick.Effects module doesn't crash the plugin.
+      Loader {
+        anchors.fill: parent
+        z: -1
+        active: main.realBlur
+        asynchronous: true
+        source: "BlurBackdrop.qml"
+        onLoaded: {
+          if (item) {
+            item.source = islandWindow
+            item.blurRadius = main.realBlurRadius
+          }
+        }
       }
 
       // Layered "fake blur" — extra translucent rectangles to soften the edge.
@@ -352,6 +369,17 @@ PanelWindow {
       }
 
       // ── Pointer interactions: hover, click, swipe ──────
+      // Scroll wheel adjusts volume (when enabled)
+      WheelHandler {
+        target: pill
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        enabled: main.scrollAdjustsVolume
+        onWheel: (event) => {
+          const sign = event.angleDelta.y > 0 ? 1 : -1
+          main.adjustVolume(sign * main.scrollVolumeStep)
+        }
+      }
+
       MouseArea {
         id: pillArea
         anchors.fill: parent
@@ -603,6 +631,15 @@ PanelWindow {
           Layout.fillHeight: true
           Layout.preferredWidth: active ? (main.expanded ? 184 : 114) : 0
           sourceComponent: CpuTempBubble { main: islandWindow.main }
+        }
+
+        // Disk warning
+        Loader {
+          active: main.diskActive && !main.osdActive
+          visible: active
+          Layout.fillHeight: true
+          Layout.preferredWidth: active ? (main.expanded ? 184 : 114) : 0
+          sourceComponent: DiskBubble { main: islandWindow.main }
         }
 
         // Focus / DND bubble

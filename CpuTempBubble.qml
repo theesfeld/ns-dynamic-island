@@ -58,11 +58,25 @@ Item {
       NText {
         Layout.fillWidth: true
         visible: root.expanded
-        text: root.hot ? "Thermal warning" : ("CPU " + root.cpuPct + "%")
+        text: root.hot
+          ? "Thermal warning"
+          : ("CPU " + root.cpuPct + "%" + (main.ramEnabled ? (" · RAM " + main.ramUsedPct + "%") : ""))
         color: Color.mOnSurfaceVariant
         pointSize: Style.fontSizeXS
         elide: Text.ElideRight
       }
+    }
+
+    // Sparkline
+    Sparkline {
+      visible: root.expanded
+      Layout.alignment: Qt.AlignVCenter
+      Layout.preferredWidth: 50
+      Layout.preferredHeight: 14
+      samples: main.cpuHistory
+      stroke: root.hot ? Color.mError : Color.mTertiary
+      fill: Qt.alpha(root.hot ? Color.mError : Color.mTertiary, 0.22)
+      minVal: 0; maxVal: 100
     }
   }
 }
