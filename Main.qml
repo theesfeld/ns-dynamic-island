@@ -19,9 +19,11 @@ Item {
 
   // Core
   readonly property bool enabled: cfg.enabled ?? def.enabled ?? true
-  // The floating overlay window. When false, no PanelWindow is created;
-  // only the bar widget is used.
-  readonly property bool overlayEnabled: cfg.overlayEnabled ?? def.overlayEnabled ?? true
+  // The floating overlay window. When false (default), no PanelWindow
+  // is created and the plugin is used purely as a bar widget. Set
+  // true if you want the layer-shell pill as well as / instead of the
+  // bar widget.
+  readonly property bool overlayEnabled: cfg.overlayEnabled ?? def.overlayEnabled ?? false
   // Whether the floating overlay accepts pointer input. Default is FALSE:
   // the pill is visible but every click passes through to whatever's
   // beneath (bar, desktop, browser). This avoids the layer-shell surface

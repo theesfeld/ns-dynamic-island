@@ -1,7 +1,7 @@
 {
   "id": "ns-dynamic-island",
   "name": "Dynamic Island",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "minNoctaliaVersion": "4.6.6",
   "author": "William Theesfeld",
   "license": "MIT",
@@ -28,7 +28,7 @@
   "metadata": {
     "defaultSettings": {
       "enabled": true,
-      "overlayEnabled": true,
+      "overlayEnabled": false,
       "overlayInteractive": false,
       "position": "top",
       "marginPx": 6,

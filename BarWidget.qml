@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Modules.Bar.Extras
+import qs.Services.Compositor
 import qs.Services.Media
 import qs.Services.UI
 import qs.Widgets
@@ -49,9 +50,32 @@ Item {
   readonly property int  activeWindowMaxChars:  cfg.activeWindowMaxChars  ?? defaults.activeWindowMaxChars  ?? 28
   readonly property int  mediaTitleMaxChars:    cfg.mediaTitleMaxChars    ?? defaults.mediaTitleMaxChars    ?? 22
 
-  // ── Polled state ─────────────────────────────────────────
+  // ── Active window (reactive via CompositorService) ───────
   property string activeWindowTitle: ""
   property string activeWindowAppId: ""
+
+  function refreshActiveWindow() {
+    const w = CompositorService.getFocusedWindow ? CompositorService.getFocusedWindow() : null
+    if (w) {
+      root.activeWindowTitle = w.title || ""
+      root.activeWindowAppId = w.appId || ""
+    } else if (typeof CompositorService.getFocusedWindowTitle === "function") {
+      root.activeWindowTitle = CompositorService.getFocusedWindowTitle() || ""
+      root.activeWindowAppId = ""
+    } else {
+      root.activeWindowTitle = ""
+      root.activeWindowAppId = ""
+    }
+  }
+
+  Connections {
+    target: CompositorService
+    function onActiveWindowChanged()  { root.refreshActiveWindow() }
+    function onWindowListChanged()    { root.refreshActiveWindow() }
+    function onWorkspaceChanged()     { root.refreshActiveWindow() }
+  }
+
+  Component.onCompleted: refreshActiveWindow()
 
   property bool   recordingActive: false
   property string recordingElapsed: ""
@@ -88,39 +112,6 @@ Item {
     repeat: true
     triggeredOnStart: true
     onTriggered: root.clockText = Qt.formatTime(new Date(), "HH:mm")
-  }
-
-  // ── Active window polling ────────────────────────────────
-  Timer {
-    interval: 1500
-    running: root.barShowActiveWindow
-    repeat: true
-    triggeredOnStart: true
-    onTriggered: if (!activeWinProbe.running) activeWinProbe.running = true
-  }
-
-  Process {
-    id: activeWinProbe
-    running: false
-    command: ["sh", "-c",
-      "if command -v niri >/dev/null 2>&1; then " +
-      "  niri msg --json focused-window 2>/dev/null | sed -n 's/.*\"title\":\\s*\"\\([^\"]*\\)\".*/\\1/p; s/.*\"app_id\":\\s*\"\\([^\"]*\\)\".*/APPID:\\1/p' | head -n2; " +
-      "elif command -v hyprctl >/dev/null 2>&1; then " +
-      "  hyprctl activewindow -j 2>/dev/null | sed -n 's/.*\"title\":\\s*\"\\([^\"]*\\)\".*/\\1/p; s/.*\"class\":\\s*\"\\([^\"]*\\)\".*/APPID:\\1/p' | head -n2; " +
-      "fi"]
-    stdout: StdioCollector {
-      onStreamFinished: {
-        const lines = (text || "").trim().split("\n")
-        let title = "", appId = ""
-        for (const l of lines) {
-          if (l.startsWith("APPID:")) appId = l.substring(6)
-          else if (title.length === 0) title = l
-        }
-        root.activeWindowTitle = title
-        root.activeWindowAppId = appId
-      }
-    }
-    onExited: running = false
   }
 
   // ── Recording polling ────────────────────────────────────
@@ -302,22 +293,22 @@ Item {
     Behavior on color { ColorAnimation { duration: 140 } }
 
     // Critical urgency / recording / low battery glow ring
+    readonly property bool glowOn:
+        (root.notifActive && root.notifUrgency === 2)
+     || root.recordingActive
+     || (root.batteryLevel >= 0 && root.batteryLevel <= 10 && root.batteryState !== "Charging")
+
     Rectangle {
       anchors.fill: parent
       anchors.margins: -2
       radius: parent.radius + 2
       color: "transparent"
       border.width: 1
-      border.color: {
-        if (root.notifActive && root.notifUrgency === 2) return Color.mError
-        if (root.recordingActive) return Color.mError
-        if (root.batteryLevel >= 0 && root.batteryLevel <= 10 && root.batteryState !== "Charging") return Color.mError
-        return "transparent"
-      }
-      visible: border.color !== "transparent"
+      border.color: Color.mError
+      visible: visualCapsule.glowOn
 
       SequentialAnimation on opacity {
-        running: parent.visible
+        running: visualCapsule.glowOn
         loops: Animation.Infinite
         NumberAnimation { to: 0.4; duration: 800; easing.type: Easing.InOutSine }
         NumberAnimation { to: 1.0; duration: 800; easing.type: Easing.InOutSine }

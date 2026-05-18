@@ -1,31 +1,33 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Services.Compositor
 import qs.Services.Media
 import qs.Services.UI
 import qs.Widgets
 
-// Detail panel shown when the bar widget is clicked. Displays the full
-// dynamic-island state with controls: media transport, notification
-// dismiss, recording info, pomodoro toggle, weather, battery, DND.
-Rectangle {
+// Detail panel shown when the bar widget is clicked. Follows Noctalia's
+// SmartPanel contract: root is an Item with geometryPlaceholder,
+// contentPreferredWidth/Height, and allowAttach. The actual content
+// lives inside panelContainer.
+Item {
   id: root
 
   property var pluginApi: null
+
+  // SmartPanel required properties
+  readonly property var geometryPlaceholder: panelContainer
+  property real contentPreferredWidth:  380 * Style.uiScaleRatio
+  property real contentPreferredHeight: 320 * Style.uiScaleRatio
+  readonly property bool allowAttach: true
+
+  anchors.fill: parent
+
+  // ── Reactive state ───────────────────────────────────────
   readonly property var cfg: pluginApi?.pluginSettings || ({})
 
-  implicitWidth: 360
-  implicitHeight: column.implicitHeight + Style.marginL * 2
-
-  color: Style.capsuleColor
-  radius: Style.radiusL
-  border.color: Style.capsuleBorderColor
-  border.width: Style.capsuleBorderWidth
-
-  // ── Reactive sources ─────────────────────────────────────
   readonly property bool mediaActive: MediaService.trackTitle.length > 0
   readonly property var firstNotif:
     NotificationService.popupModel && NotificationService.popupModel.count > 0
@@ -33,47 +35,36 @@ Rectangle {
   readonly property int notifCount:
     NotificationService.popupModel ? NotificationService.popupModel.count : 0
 
-  // Local state mirrors (polled)
+  // Active window via CompositorService (Niri / Hyprland)
+  property string activeWindowTitle: ""
+  property string activeWindowAppId: ""
+
+  function refreshActiveWindow() {
+    const w = CompositorService.getFocusedWindow ? CompositorService.getFocusedWindow() : null
+    if (w) {
+      root.activeWindowTitle = w.title || ""
+      root.activeWindowAppId = w.appId || ""
+    }
+  }
+
+  Connections {
+    target: CompositorService
+    function onActiveWindowChanged() { root.refreshActiveWindow() }
+    function onWindowListChanged()   { root.refreshActiveWindow() }
+  }
+
+  // Live clock
   property string clockText: Qt.formatTime(new Date(), "HH:mm:ss")
   Timer {
-    interval: 1000; running: root.visible; repeat: true; triggeredOnStart: true
+    interval: 1000; running: true; repeat: true; triggeredOnStart: true
     onTriggered: root.clockText = Qt.formatTime(new Date(), "HH:mm:ss")
   }
 
-  property string activeWindowTitle: ""
-  property string activeWindowAppId: ""
-  Timer {
-    interval: 1500; running: root.visible; repeat: true; triggeredOnStart: true
-    onTriggered: if (!winProbe.running) winProbe.running = true
-  }
-  Process {
-    id: winProbe
-    running: false
-    command: ["sh", "-c",
-      "if command -v niri >/dev/null 2>&1; then " +
-      "  niri msg --json focused-window 2>/dev/null | sed -n 's/.*\"title\":\\s*\"\\([^\"]*\\)\".*/\\1/p; s/.*\"app_id\":\\s*\"\\([^\"]*\\)\".*/APPID:\\1/p' | head -n2; " +
-      "elif command -v hyprctl >/dev/null 2>&1; then " +
-      "  hyprctl activewindow -j 2>/dev/null | sed -n 's/.*\"title\":\\s*\"\\([^\"]*\\)\".*/\\1/p; s/.*\"class\":\\s*\"\\([^\"]*\\)\".*/APPID:\\1/p' | head -n2; " +
-      "fi"]
-    stdout: StdioCollector {
-      onStreamFinished: {
-        const lines = (text || "").trim().split("\n")
-        let title = "", appId = ""
-        for (const l of lines) {
-          if (l.startsWith("APPID:")) appId = l.substring(6)
-          else if (title.length === 0) title = l
-        }
-        root.activeWindowTitle = title
-        root.activeWindowAppId = appId
-      }
-    }
-    onExited: running = false
-  }
-
+  // Weather from shared cache
   property string weatherTemp: ""
   property string weatherCondition: ""
   Timer {
-    interval: 10 * 60 * 1000; running: root.visible; repeat: true; triggeredOnStart: true
+    interval: 10 * 60 * 1000; running: true; repeat: true; triggeredOnStart: true
     onTriggered: if (!wxProbe.running) wxProbe.running = true
   }
   Process {
@@ -94,10 +85,11 @@ Rectangle {
     onExited: running = false
   }
 
+  // Battery from /sys
   property int batteryLevel: -1
   property string batteryState: ""
   Timer {
-    interval: 30000; running: root.visible; repeat: true; triggeredOnStart: true
+    interval: 30000; running: true; repeat: true; triggeredOnStart: true
     onTriggered: if (!batProbe.running) batProbe.running = true
   }
   Process {
@@ -116,269 +108,295 @@ Rectangle {
     onExited: running = false
   }
 
-  // ── Layout ───────────────────────────────────────────────
-  ColumnLayout {
-    id: column
-    anchors {
-      fill: parent
-      margins: Style.marginL
-    }
-    spacing: Style.marginM
+  Component.onCompleted: refreshActiveWindow()
 
-    // Header — clock + weather
-    RowLayout {
-      Layout.fillWidth: true
-      spacing: Style.marginM
+  function weatherIcon() {
+    const c = (root.weatherCondition || "").toLowerCase()
+    if (c.indexOf("snow") !== -1) return "weather-snow"
+    if (c.indexOf("rain") !== -1) return "weather-rain"
+    if (c.indexOf("cloud") !== -1) return "weather-cloud"
+    if (c.indexOf("fog") !== -1) return "weather-fog"
+    return "weather-sun"
+  }
 
-      NText {
-        text: root.clockText
-        color: Color.mOnSurface
-        pointSize: Style.fontSizeL
-        font.weight: Font.Bold
-        font.family: "monospace"
-        Layout.fillWidth: true
+  function batteryIcon() {
+    if (batteryState === "Charging") return "battery-charging"
+    if (batteryLevel >= 90) return "battery-full"
+    if (batteryLevel >= 60) return "battery-high"
+    if (batteryLevel >= 30) return "battery-medium"
+    if (batteryLevel >= 10) return "battery-low"
+    return "battery-empty"
+  }
+
+  Rectangle {
+    id: panelContainer
+    anchors.fill: parent
+    color: "transparent"
+
+    Rectangle {
+      anchors {
+        fill: parent
+        margins: Style.marginS
       }
-      NIcon {
-        visible: root.weatherTemp.length > 0
-        icon: {
-          const c = (root.weatherCondition || "").toLowerCase()
-          if (c.indexOf("snow") !== -1) return "weather-snow"
-          if (c.indexOf("rain") !== -1) return "weather-rain"
-          if (c.indexOf("cloud") !== -1) return "weather-cloud"
-          return "weather-sun"
-        }
-        color: Color.mOnSurfaceVariant
-      }
-      NText {
-        visible: root.weatherTemp.length > 0
-        text: root.weatherTemp
-        color: Color.mOnSurfaceVariant
-        pointSize: Style.fontSizeM
-      }
-    }
+      color: Style.capsuleColor
+      radius: Style.radiusL
+      border.color: Style.capsuleBorderColor
+      border.width: Style.capsuleBorderWidth
+      clip: true
 
-    NDivider { Layout.fillWidth: true }
-
-    // Active window
-    RowLayout {
-      Layout.fillWidth: true
-      visible: root.activeWindowTitle.length > 0
-      spacing: Style.marginS
-
-      NIcon { icon: "window"; color: Color.mOnSurfaceVariant }
       ColumnLayout {
-        Layout.fillWidth: true
-        spacing: 0
-        NText {
-          Layout.fillWidth: true
-          text: root.activeWindowTitle
-          color: Color.mOnSurface
-          pointSize: Style.fontSizeM
-          font.weight: Font.Medium
-          elide: Text.ElideRight
+        anchors {
+          fill: parent
+          margins: Style.marginM
         }
-        NText {
-          visible: root.activeWindowAppId.length > 0
-          text: root.activeWindowAppId
-          color: Color.mOnSurfaceVariant
-          pointSize: Style.fontSizeXS
-        }
-      }
-    }
-
-    NDivider {
-      Layout.fillWidth: true
-      visible: root.activeWindowTitle.length > 0
-        && (root.mediaActive || root.firstNotif || root.batteryLevel >= 0)
-    }
-
-    // Media
-    ColumnLayout {
-      Layout.fillWidth: true
-      visible: root.mediaActive
-      spacing: Style.marginS
-
-      RowLayout {
-        Layout.fillWidth: true
         spacing: Style.marginS
 
-        Rectangle {
-          width: 48; height: 48; radius: 8
-          color: Qt.alpha(Color.mSurfaceVariant, 0.85)
-          clip: true
+        // ── Header: clock + weather ───────────────────
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.marginM
 
-          Image {
-            anchors.fill: parent
-            source: MediaService.trackArtUrl
-            fillMode: Image.PreserveAspectCrop
-            visible: MediaService.trackArtUrl.length > 0 && status === Image.Ready
-            asynchronous: true; cache: true
+          NText {
+            text: root.clockText
+            color: Color.mOnSurface
+            pointSize: Style.fontSizeXL
+            font.weight: Font.Bold
+            font.family: "monospace"
+            Layout.fillWidth: true
           }
           NIcon {
-            anchors.centerIn: parent
-            icon: "music"
-            color: Color.mPrimary
-            visible: MediaService.trackArtUrl.length === 0
+            visible: root.weatherTemp.length > 0
+            icon: root.weatherIcon()
+            color: Color.mOnSurfaceVariant
+            applyUiScale: true
+          }
+          NText {
+            visible: root.weatherTemp.length > 0
+            text: root.weatherTemp
+            color: Color.mOnSurfaceVariant
+            pointSize: Style.fontSizeM
           }
         }
 
+        NDivider { Layout.fillWidth: true }
+
+        // ── Active window ─────────────────────────────
+        RowLayout {
+          Layout.fillWidth: true
+          visible: root.activeWindowTitle.length > 0
+          spacing: Style.marginS
+
+          NIcon { icon: "window"; color: Color.mOnSurfaceVariant; applyUiScale: true }
+          ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 0
+            NText {
+              Layout.fillWidth: true
+              text: root.activeWindowTitle
+              color: Color.mOnSurface
+              pointSize: Style.fontSizeM
+              font.weight: Font.Medium
+              elide: Text.ElideRight
+            }
+            NText {
+              visible: root.activeWindowAppId.length > 0
+              text: root.activeWindowAppId
+              color: Color.mOnSurfaceVariant
+              pointSize: Style.fontSizeXS
+            }
+          }
+        }
+
+        NDivider {
+          Layout.fillWidth: true
+          visible: root.activeWindowTitle.length > 0
+            && (root.mediaActive || root.firstNotif !== null || root.batteryLevel >= 0)
+        }
+
+        // ── Media ─────────────────────────────────────
         ColumnLayout {
           Layout.fillWidth: true
-          spacing: 0
-          NText {
+          visible: root.mediaActive
+          spacing: Style.marginS
+
+          RowLayout {
             Layout.fillWidth: true
-            text: MediaService.trackTitle
-            color: Color.mOnSurface
-            pointSize: Style.fontSizeM
-            font.weight: Font.Medium
-            elide: Text.ElideRight
+            spacing: Style.marginS
+
+            Rectangle {
+              width: 48 * Style.uiScaleRatio
+              height: 48 * Style.uiScaleRatio
+              radius: 8
+              color: Color.mSurfaceVariant
+              clip: true
+
+              Image {
+                anchors.fill: parent
+                source: MediaService.trackArtUrl
+                fillMode: Image.PreserveAspectCrop
+                visible: MediaService.trackArtUrl.length > 0 && status === Image.Ready
+                asynchronous: true; cache: true
+              }
+              NIcon {
+                anchors.centerIn: parent
+                icon: "music"
+                color: Color.mOnSurface
+                visible: MediaService.trackArtUrl.length === 0
+                applyUiScale: true
+              }
+            }
+
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: 0
+              NText {
+                Layout.fillWidth: true
+                text: MediaService.trackTitle
+                color: Color.mOnSurface
+                pointSize: Style.fontSizeM
+                font.weight: Font.Medium
+                elide: Text.ElideRight
+              }
+              NText {
+                Layout.fillWidth: true
+                text: MediaService.trackArtist
+                color: Color.mOnSurfaceVariant
+                pointSize: Style.fontSizeXS
+                elide: Text.ElideRight
+              }
+            }
           }
-          NText {
+
+          RowLayout {
             Layout.fillWidth: true
-            text: MediaService.trackArtist
-            color: Color.mOnSurfaceVariant
-            pointSize: Style.fontSizeXS
-            elide: Text.ElideRight
+            Layout.alignment: Qt.AlignHCenter
+            spacing: Style.marginS
+
+            NIconButton {
+              icon: "media-prev"
+              enabled: MediaService.canGoPrevious
+              onClicked: {
+                const p = MediaService.currentPlayer
+                if (p && MediaService.canGoPrevious) p.previous()
+              }
+            }
+            NIconButton {
+              icon: MediaService.isPlaying ? "media-pause" : "media-play"
+              onClicked: {
+                const p = MediaService.currentPlayer
+                if (!p) return
+                if (MediaService.isPlaying) p.pause(); else p.play()
+              }
+            }
+            NIconButton {
+              icon: "media-next"
+              enabled: MediaService.canGoNext
+              onClicked: {
+                const p = MediaService.currentPlayer
+                if (p && MediaService.canGoNext) p.next()
+              }
+            }
           }
         }
-      }
 
-      RowLayout {
-        Layout.fillWidth: true
-        Layout.alignment: Qt.AlignHCenter
-        spacing: Style.marginS
-
-        NIconButton {
-          icon: "media-prev"
-          enabled: MediaService.canGoPrevious
-          onClicked: {
-            const p = MediaService.currentPlayer
-            if (p && MediaService.canGoPrevious) p.previous()
-          }
-        }
-        NIconButton {
-          icon: MediaService.isPlaying ? "media-pause" : "media-play"
-          onClicked: {
-            const p = MediaService.currentPlayer
-            if (!p) return
-            if (MediaService.isPlaying) p.pause(); else p.play()
-          }
-        }
-        NIconButton {
-          icon: "media-next"
-          enabled: MediaService.canGoNext
-          onClicked: {
-            const p = MediaService.currentPlayer
-            if (p && MediaService.canGoNext) p.next()
-          }
-        }
-      }
-    }
-
-    NDivider {
-      Layout.fillWidth: true
-      visible: root.mediaActive && (root.firstNotif || root.batteryLevel >= 0)
-    }
-
-    // Top notification
-    ColumnLayout {
-      Layout.fillWidth: true
-      visible: root.firstNotif !== null
-      spacing: Style.marginS
-
-      RowLayout {
-        Layout.fillWidth: true
-        spacing: Style.marginS
-
-        NIcon {
-          icon: root.firstNotif && root.firstNotif.urgency === 2 ? "alert" : "bell"
-          color: root.firstNotif && root.firstNotif.urgency === 2 ? Color.mError : Color.mTertiary
-        }
-        ColumnLayout {
+        NDivider {
           Layout.fillWidth: true
-          spacing: 0
+          visible: root.mediaActive && (root.firstNotif !== null || root.batteryLevel >= 0)
+        }
+
+        // ── Top notification ──────────────────────────
+        RowLayout {
+          Layout.fillWidth: true
+          visible: root.firstNotif !== null
+          spacing: Style.marginS
+
+          NIcon {
+            icon: root.firstNotif && root.firstNotif.urgency === 2 ? "alert" : "bell"
+            color: root.firstNotif && root.firstNotif.urgency === 2 ? Color.mError : Color.mTertiary
+            applyUiScale: true
+          }
+          ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 0
+            NText {
+              Layout.fillWidth: true
+              text: root.firstNotif ? (root.firstNotif.summary || root.firstNotif.appName || "") : ""
+              color: Color.mOnSurface
+              pointSize: Style.fontSizeM
+              font.weight: Font.Medium
+              elide: Text.ElideRight
+            }
+            NText {
+              Layout.fillWidth: true
+              visible: root.firstNotif && root.firstNotif.body && root.firstNotif.body.length > 0
+              text: root.firstNotif ? root.firstNotif.body : ""
+              color: Color.mOnSurfaceVariant
+              pointSize: Style.fontSizeXS
+              elide: Text.ElideRight
+              wrapMode: Text.WordWrap
+              maximumLineCount: 3
+            }
+          }
+          NText {
+            visible: root.notifCount > 1
+            text: "+" + (root.notifCount - 1)
+            color: Color.mTertiary
+            pointSize: Style.fontSizeXS
+            font.weight: Font.Bold
+          }
+        }
+
+        NDivider {
+          Layout.fillWidth: true
+          visible: root.firstNotif !== null && root.batteryLevel >= 0
+        }
+
+        // ── Battery ───────────────────────────────────
+        RowLayout {
+          Layout.fillWidth: true
+          visible: root.batteryLevel >= 0
+          spacing: Style.marginS
+
+          NIcon {
+            icon: root.batteryIcon()
+            color: root.batteryLevel <= 10 && root.batteryState !== "Charging"
+                   ? Color.mError : Color.mOnSurfaceVariant
+            applyUiScale: true
+          }
           NText {
             Layout.fillWidth: true
-            text: root.firstNotif ? (root.firstNotif.summary || root.firstNotif.appName || "") : ""
+            text: root.batteryLevel + "% · " + (root.batteryState || "Unknown")
             color: Color.mOnSurface
             pointSize: Style.fontSizeM
-            font.weight: Font.Medium
-            elide: Text.ElideRight
           }
-          NText {
+        }
+
+        Item { Layout.fillHeight: true }   // push the action row to the bottom
+
+        // ── Quick actions ─────────────────────────────
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.marginS
+
+          NIconButton {
+            icon: "moon"
             Layout.fillWidth: true
-            visible: root.firstNotif && root.firstNotif.body && root.firstNotif.body.length > 0
-            text: root.firstNotif ? root.firstNotif.body : ""
-            color: Color.mOnSurfaceVariant
-            pointSize: Style.fontSizeXS
-            elide: Text.ElideRight
-            wrapMode: Text.WordWrap
-            maximumLineCount: 3
+            onClicked: Quickshell.execDetached(["sh", "-c",
+              "qs ipc call plugin:ns-dynamic-island dnd " + (root.cfg.dndEnabled ? "false" : "true") + " 2>/dev/null || true"])
+          }
+          NIconButton {
+            icon: "timer"
+            Layout.fillWidth: true
+            onClicked: Quickshell.execDetached(["sh", "-c",
+              "qs ipc call plugin:ns-dynamic-island pomodoroToggle 2>/dev/null || true"])
+          }
+          NIconButton {
+            icon: "eye"
+            Layout.fillWidth: true
+            onClicked: Quickshell.execDetached(["sh", "-c",
+              "qs ipc call plugin:ns-dynamic-island toggle 2>/dev/null || true"])
           }
         }
-        NText {
-          visible: root.notifCount > 1
-          text: "+" + (root.notifCount - 1)
-          color: Color.mTertiary
-          pointSize: Style.fontSizeXS
-          font.weight: Font.Bold
-        }
-      }
-    }
-
-    NDivider {
-      Layout.fillWidth: true
-      visible: root.firstNotif !== null && root.batteryLevel >= 0
-    }
-
-    // Battery
-    RowLayout {
-      Layout.fillWidth: true
-      visible: root.batteryLevel >= 0
-      spacing: Style.marginS
-
-      NIcon {
-        icon: root.batteryState === "Charging" ? "battery-charging"
-          : root.batteryLevel >= 90 ? "battery-full"
-          : root.batteryLevel >= 60 ? "battery-high"
-          : root.batteryLevel >= 30 ? "battery-medium"
-          : root.batteryLevel >= 10 ? "battery-low"
-          : "battery-empty"
-        color: root.batteryLevel <= 10 && root.batteryState !== "Charging"
-               ? Color.mError : Color.mOnSurfaceVariant
-      }
-      NText {
-        Layout.fillWidth: true
-        text: root.batteryLevel + "% · " + (root.batteryState || "Unknown")
-        color: Color.mOnSurface
-        pointSize: Style.fontSizeM
-      }
-    }
-
-    NDivider { Layout.fillWidth: true }
-
-    // Quick actions
-    RowLayout {
-      Layout.fillWidth: true
-      spacing: Style.marginS
-
-      NIconButton {
-        icon: "moon"
-        Layout.fillWidth: true
-        onClicked: Quickshell.execDetached(["sh", "-c",
-          "qs ipc call plugin:ns-dynamic-island dnd " + (root.cfg.dndEnabled ? "false" : "true")])
-      }
-      NIconButton {
-        icon: "timer"
-        Layout.fillWidth: true
-        onClicked: Quickshell.execDetached(["sh", "-c",
-          "qs ipc call plugin:ns-dynamic-island pomodoroToggle"])
-      }
-      NIconButton {
-        icon: "eye"
-        Layout.fillWidth: true
-        onClicked: Quickshell.execDetached(["sh", "-c",
-          "qs ipc call plugin:ns-dynamic-island toggle"])
       }
     }
   }
