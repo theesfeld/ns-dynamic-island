@@ -395,6 +395,18 @@ Item {
   Component.onCompleted: {
     if (root.weatherCacheEnabled) weatherCacheLoad.running = true
 
+    // One-time migration: prior versions defaulted overlayEnabled to true,
+    // so existing users would see the floating overlay AND the bar widget
+    // simultaneously. From 0.5.2 the default is false. Force-reset once
+    // for upgraders so the floating pill stops popping up unexpectedly.
+    // Users who actively want the overlay can re-enable it in Settings.
+    if (root.pluginApi && root.pluginApi.pluginSettings
+        && !root.pluginApi.pluginSettings.overlayMigrationV052) {
+      root.pluginApi.pluginSettings.overlayEnabled = false
+      root.pluginApi.pluginSettings.overlayMigrationV052 = true
+      try { root.pluginApi.saveSettings() } catch (e) {}
+    }
+
     // Roll-over pomodoro stats if it's a new day
     if (root.pomodoroStatsEnabled) {
       const today = root._todayString()
