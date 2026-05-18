@@ -132,9 +132,17 @@ ColumnLayout {
 
   // Bar widget
   property bool   editBarShowClock:         cfg.barShowClock ?? def.barShowClock ?? true
+  property bool   editBarShowWeather:       cfg.barShowWeather ?? def.barShowWeather ?? true
+  property bool   editBarShowActiveWindow:  cfg.barShowActiveWindow ?? def.barShowActiveWindow ?? true
   property bool   editBarShowMedia:         cfg.barShowMedia ?? def.barShowMedia ?? true
   property bool   editBarShowNotifications: cfg.barShowNotifications ?? def.barShowNotifications ?? true
-  property string editBarClickAction:       cfg.barClickAction || def.barClickAction || "peek"
+  property bool   editBarShowRecording:     cfg.barShowRecording ?? def.barShowRecording ?? true
+  property bool   editBarShowBattery:       cfg.barShowBattery ?? def.barShowBattery ?? true
+  property bool   editBarShowPomodoro:      cfg.barShowPomodoro ?? def.barShowPomodoro ?? true
+  property bool   editBarShowPrivacy:       cfg.barShowPrivacy ?? def.barShowPrivacy ?? true
+  property string editBarClickAction:       cfg.barClickAction || def.barClickAction || "panel"
+  property int    editActiveWindowMaxChars: cfg.activeWindowMaxChars ?? def.activeWindowMaxChars ?? 28
+  property int    editMediaTitleMaxChars:   cfg.mediaTitleMaxChars ?? def.mediaTitleMaxChars ?? 22
 
   // Auto-polling
   property bool   editKeyboardLayoutAutoPoll: cfg.keyboardLayoutAutoPoll ?? def.keyboardLayoutAutoPoll ?? true
@@ -1199,31 +1207,81 @@ ColumnLayout {
   // ════════ Bar widget ════════
   NLabel {
     label: "Bar widget"
-    description: "An inline summary widget to drop into the Noctalia bar."
+    description: "Toggle each piece of state shown in the inline bar capsule. All visible at once."
   }
   NToggle {
     Layout.fillWidth: true
-    label: "Show clock fallback"
-    description: "When nothing else is happening, the bar widget shows the time."
-    checked: root.editBarShowClock
-    onToggled: checked => root.editBarShowClock = checked
+    label: "Active window title"
+    checked: root.editBarShowActiveWindow
+    onToggled: checked => root.editBarShowActiveWindow = checked
   }
   NToggle {
     Layout.fillWidth: true
-    label: "Show current media"
+    label: "Current media"
     checked: root.editBarShowMedia
     onToggled: checked => root.editBarShowMedia = checked
   }
   NToggle {
     Layout.fillWidth: true
-    label: "Show pending notification"
+    label: "Recording timer"
+    checked: root.editBarShowRecording
+    onToggled: checked => root.editBarShowRecording = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Pending notifications"
     checked: root.editBarShowNotifications
     onToggled: checked => root.editBarShowNotifications = checked
   }
-  NLabel { label: "Click action" }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Pomodoro countdown"
+    checked: root.editBarShowPomodoro
+    onToggled: checked => root.editBarShowPomodoro = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Privacy dots (mic / camera in use)"
+    checked: root.editBarShowPrivacy
+    onToggled: checked => root.editBarShowPrivacy = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Battery (when low or charging)"
+    checked: root.editBarShowBattery
+    onToggled: checked => root.editBarShowBattery = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Clock"
+    checked: root.editBarShowClock
+    onToggled: checked => root.editBarShowClock = checked
+  }
+  NToggle {
+    Layout.fillWidth: true
+    label: "Weather"
+    checked: root.editBarShowWeather
+    onToggled: checked => root.editBarShowWeather = checked
+  }
+  NLabel { label: "Active window title max chars: " + root.editActiveWindowMaxChars }
+  NSlider {
+    Layout.fillWidth: true
+    from: 8; to: 80; stepSize: 1
+    value: root.editActiveWindowMaxChars
+    onValueChanged: root.editActiveWindowMaxChars = value
+  }
+  NLabel { label: "Media title max chars: " + root.editMediaTitleMaxChars }
+  NSlider {
+    Layout.fillWidth: true
+    from: 8; to: 60; stepSize: 1
+    value: root.editMediaTitleMaxChars
+    onValueChanged: root.editMediaTitleMaxChars = value
+  }
+  NLabel { label: "Left click action" }
   NComboBox {
     Layout.fillWidth: true
     model: [
+      { key: "panel",  name: "Open detail panel (recommended)" },
       { key: "peek",   name: "Peek floating island" },
       { key: "toggle", name: "Toggle floating island" }
     ]
@@ -1383,9 +1441,17 @@ ColumnLayout {
 
     // Bar widget
     s.barShowClock = root.editBarShowClock
+    s.barShowWeather = root.editBarShowWeather
+    s.barShowActiveWindow = root.editBarShowActiveWindow
     s.barShowMedia = root.editBarShowMedia
     s.barShowNotifications = root.editBarShowNotifications
+    s.barShowRecording = root.editBarShowRecording
+    s.barShowBattery = root.editBarShowBattery
+    s.barShowPomodoro = root.editBarShowPomodoro
+    s.barShowPrivacy = root.editBarShowPrivacy
     s.barClickAction = root.editBarClickAction
+    s.activeWindowMaxChars = root.editActiveWindowMaxChars
+    s.mediaTitleMaxChars = root.editMediaTitleMaxChars
 
     // Automation
     s.keyboardLayoutAutoPoll = root.editKeyboardLayoutAutoPoll

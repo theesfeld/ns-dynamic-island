@@ -1,7 +1,7 @@
 {
   "id": "ns-dynamic-island",
   "name": "Dynamic Island",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "minNoctaliaVersion": "4.6.6",
   "author": "William Theesfeld",
   "license": "MIT",
@@ -19,6 +19,7 @@
   "entryPoints": {
     "main": "Main.qml",
     "barWidget": "BarWidget.qml",
+    "panel": "Panel.qml",
     "settings": "Settings.qml"
   },
   "dependencies": {
@@ -124,9 +125,17 @@
       "cpuTempCritical": 85,
 
       "barShowClock": true,
+      "barShowWeather": true,
+      "barShowActiveWindow": true,
       "barShowMedia": true,
       "barShowNotifications": true,
-      "barClickAction": "peek",
+      "barShowRecording": true,
+      "barShowBattery": true,
+      "barShowPomodoro": true,
+      "barShowPrivacy": true,
+      "barClickAction": "panel",
+      "activeWindowMaxChars": 28,
+      "mediaTitleMaxChars": 22,
 
       "keyboardLayoutAutoPoll": true,
       "keyboardLayoutPollSec": 2,
