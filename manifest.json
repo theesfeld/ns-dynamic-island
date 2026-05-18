@@ -1,13 +1,14 @@
 {
   "id": "ns-dynamic-island",
   "name": "Dynamic Island",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "minNoctaliaVersion": "4.6.6",
   "author": "William Theesfeld",
   "license": "MIT",
   "repository": "https://github.com/theesfeld/ns-dynamic-island",
   "description": "A floating, morphing top-of-screen island. Reacts to media, notifications, recording, battery, network, bluetooth, pomodoro, clipboard, screenshots, downloads, CPU/temp, volume/brightness OSD and more.",
   "tags": [
+    "Bar",
     "Overlay",
     "Media",
     "Notifications",
@@ -17,18 +18,9 @@
   ],
   "entryPoints": {
     "main": "Main.qml",
-    "settings": "Settings.qml",
-    "widget": "BarWidget.qml",
-    "barWidget": "BarWidget.qml"
+    "barWidget": "BarWidget.qml",
+    "settings": "Settings.qml"
   },
-  "barWidgets": [
-    {
-      "id": "ns-dynamic-island.bar",
-      "name": "Dynamic Island",
-      "description": "Compact island summary embeddable in the Noctalia bar.",
-      "entry": "BarWidget.qml"
-    }
-  ],
   "dependencies": {
     "plugins": []
   },
