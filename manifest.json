@@ -1,16 +1,19 @@
 {
   "id": "ns-dynamic-island",
   "name": "Dynamic Island",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minNoctaliaVersion": "4.6.6",
   "author": "William Theesfeld",
   "license": "MIT",
   "repository": "https://github.com/theesfeld/ns-dynamic-island",
-  "description": "A floating, morphing top-of-screen island that reacts to media, notifications, and screen recording.",
+  "description": "A floating, morphing top-of-screen island. Reacts to media, notifications, recording, battery, network, bluetooth, pomodoro, clipboard, screenshots, downloads, CPU/temp, volume/brightness OSD and more.",
   "tags": [
     "Overlay",
     "Media",
-    "Notifications"
+    "Notifications",
+    "OSD",
+    "Pomodoro",
+    "Privacy"
   ],
   "entryPoints": {
     "main": "Main.qml",
@@ -31,17 +34,90 @@
       "cornerRadius": 18,
       "hideDelaySec": 4,
       "hoverToExpand": true,
+      "dualBubble": true,
+      "disabledScreens": [],
+
+      "themePreset": "system",
+      "highContrast": false,
+      "largeText": false,
+      "backdropOpacity": 0.94,
+      "fakeBlur": true,
+
+      "springExpand": true,
+      "criticalGlow": true,
+      "timeOfDayTint": true,
+      "dynamicMediaAccent": true,
+      "smoothMediaPosition": true,
+      "iconMicroAnimations": true,
+
+      "swipeGestures": true,
+      "scrubMedia": true,
+      "contextMenu": true,
+
       "autoShowOnMedia": true,
+
       "autoShowOnNotification": true,
       "notificationDurationSec": 5,
+      "stackNotifications": true,
+      "showNotificationActions": true,
+      "dndEnabled": false,
+      "dndPausesMediaAutoShow": false,
+      "notificationMutedApps": [],
+      "notificationPinnedApps": [],
+
       "detectScreenRecording": true,
       "recordingPollSec": 3,
+
       "idleShowClock": true,
+      "idleShowSeconds": false,
+      "idleUse24h": true,
       "idleShowWeather": false,
       "weatherLocation": "",
       "weatherUnits": "metric",
-      "dualBubble": true,
-      "disabledScreens": []
+      "weatherCacheEnabled": true,
+
+      "batteryEnabled": true,
+      "batteryLowThreshold": 20,
+      "batteryPollSec": 30,
+      "batteryShowOnChange": true,
+
+      "osdEnabled": true,
+      "osdDurationSec": 2,
+
+      "pomodoroEnabled": true,
+      "pomodoroWorkMin": 25,
+      "pomodoroShortBreakMin": 5,
+      "pomodoroLongBreakMin": 15,
+      "pomodoroLongBreakEvery": 4,
+      "pomodoroAutoDnd": false,
+
+      "timerEnabled": true,
+
+      "privacyIndicatorEnabled": true,
+      "privacyPollSec": 4,
+
+      "networkEnabled": true,
+      "networkPollSec": 8,
+
+      "bluetoothEnabled": true,
+
+      "keyboardLayoutEnabled": true,
+
+      "workspaceEnabled": true,
+
+      "clipboardEnabled": false,
+      "clipboardAutoWatch": false,
+      "clipboardPrivacy": true,
+      "screenshotEnabled": true,
+      "screenshotDir": "",
+
+      "calendarEnabled": false,
+
+      "downloadEnabled": true,
+
+      "cpuEnabled": false,
+      "cpuPollSec": 5,
+      "cpuTempCritical": 85
     }
   }
 }

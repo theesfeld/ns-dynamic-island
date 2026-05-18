@@ -8,16 +8,25 @@ Item {
   required property var main
 
   readonly property bool expanded: main.expanded
-  readonly property real progress:
+  readonly property real liveProgress:
       main.mediaLength > 0
-        ? Math.max(0, Math.min(1, main.mediaPosition / main.mediaLength))
+        ? Math.max(0, Math.min(1,
+            (main.smoothMediaPosition ? main.smoothedMediaPosition : main.mediaPosition) / main.mediaLength))
         : 0
+  readonly property color accent: main.mediaAccent
+
+  function mmss(s) {
+    if (s <= 0 || isNaN(s)) return "0:00"
+    const m = Math.floor(s / 60)
+    const r = Math.floor(s) % 60
+    return m + ":" + (r < 10 ? "0" : "") + r
+  }
 
   RowLayout {
     anchors.fill: parent
     spacing: 8
 
-    // ── Album art (or music icon fallback) ────────────────
+    // Album art (rotates subtly when playing if iconMicroAnimations is on)
     Item {
       Layout.preferredWidth: Math.max(18, parent.height - 8)
       Layout.preferredHeight: Math.max(18, parent.height - 8)
@@ -40,23 +49,32 @@ Item {
           sourceSize.height: height * 2
         }
 
+        // Subtle dynamic-accent ring
+        Rectangle {
+          anchors.fill: parent
+          radius: parent.radius
+          color: "transparent"
+          border.color: Qt.alpha(root.accent, 0.55)
+          border.width: 1
+          visible: main.dynamicMediaAccent
+        }
+
         NIcon {
           anchors.centerIn: parent
           icon: "music"
           pointSize: Style.fontSizeS
-          color: Color.mPrimary
+          color: root.accent
           visible: main.mediaArtUrl.length === 0
         }
       }
     }
 
-    // ── Text + progress ───────────────────────────────────
+    // Text + progress
     ColumnLayout {
       Layout.fillWidth: true
       Layout.fillHeight: true
       spacing: 0
 
-      // Title (marquees when overflowing, otherwise elides)
       Item {
         Layout.fillWidth: true
         Layout.preferredHeight: titleText.implicitHeight
@@ -64,18 +82,16 @@ Item {
 
         NText {
           id: titleText
-          // When expanded with progress, sit a touch above center; otherwise center.
           y: (parent.height - implicitHeight) / 2
           text: main.mediaTitle
           color: Color.mOnSurface
-          pointSize: Style.fontSizeS
+          pointSize: Style.fontSizeS * main.textScale
           font.weight: Font.Medium
           elide: Text.ElideRight
           width: parent.width
 
           readonly property bool overflows: implicitWidth > width
 
-          // Subtle horizontal marquee when text overflows and we're expanded.
           SequentialAnimation on x {
             running: titleText.overflows && root.expanded
             loops: Animation.Infinite
@@ -92,40 +108,70 @@ Item {
         }
       }
 
-      NText {
+      RowLayout {
         Layout.fillWidth: true
         visible: root.expanded && main.mediaArtist.length > 0
-        text: main.mediaArtist
-        color: Color.mOnSurfaceVariant
-        pointSize: Style.fontSizeXS
-        elide: Text.ElideRight
+        spacing: 6
+
+        NText {
+          Layout.fillWidth: true
+          text: main.mediaArtist
+          color: Color.mOnSurfaceVariant
+          pointSize: Style.fontSizeXS * main.textScale
+          elide: Text.ElideRight
+        }
+        NText {
+          visible: main.mediaLength > 0
+          text: root.mmss(main.smoothMediaPosition ? main.smoothedMediaPosition : main.mediaPosition)
+              + " / " + root.mmss(main.mediaLength)
+          color: Color.mOnSurfaceVariant
+          pointSize: Style.fontSizeXS * main.textScale
+          font.family: "monospace"
+        }
       }
 
-      // Progress bar (expanded only)
-      Rectangle {
+      // Scrubbable progress bar
+      Item {
         Layout.fillWidth: true
-        Layout.preferredHeight: 2
+        Layout.preferredHeight: 6
         Layout.topMargin: 3
         visible: root.expanded && main.mediaLength > 0
-        color: Qt.alpha(Color.mOutline, 0.35)
-        radius: 1
 
         Rectangle {
-          anchors.left: parent.left
-          anchors.top: parent.top
-          anchors.bottom: parent.bottom
-          width: parent.width * root.progress
-          color: Color.mPrimary
+          id: progressTrack
+          anchors.fill: parent
+          anchors.topMargin: 2
+          anchors.bottomMargin: 2
+          color: Qt.alpha(Color.mOutline, 0.35)
           radius: 1
 
-          Behavior on width {
-            NumberAnimation { duration: 350; easing.type: Easing.Linear }
+          Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: parent.width * root.liveProgress
+            color: root.accent
+            radius: 1
+            Behavior on width {
+              NumberAnimation { duration: 350; easing.type: Easing.Linear }
+            }
+          }
+        }
+
+        MouseArea {
+          anchors.fill: parent
+          enabled: main.scrubMedia && main.mediaLength > 0
+          hoverEnabled: true
+          cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+          onClicked: (mouse) => main.mediaSeek(mouse.x / width)
+          onPositionChanged: (mouse) => {
+            if (pressed) main.mediaSeek(mouse.x / width)
           }
         }
       }
     }
 
-    // ── Transport controls (expanded only) ────────────────
+    // Transport controls
     RowLayout {
       visible: root.expanded
       Layout.alignment: Qt.AlignVCenter
