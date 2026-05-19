@@ -92,9 +92,11 @@ Item {
   property string weatherTemp: ""
   property string weatherCondition: ""
 
-  property bool   pomodoroActive: false
-  property int    pomodoroRemainingSec: 0
-  property string pomodoroPhase: "idle"
+  // Pomodoro live state — mirrored from Main.qml via pluginSettings
+  readonly property string pomodoroPhase: cfg.pomodoroLivePhase || "idle"
+  readonly property int    pomodoroRemainingSec: cfg.pomodoroLiveRemaining || 0
+  readonly property int    pomodoroLiveTotal: cfg.pomodoroLiveTotal || 0
+  readonly property bool   pomodoroActive: pomodoroPhase !== "idle"
 
   property bool   micInUse: false
   property bool   camInUse: false
@@ -305,14 +307,24 @@ Item {
       NumberAnimation { duration: Style.animationFast; easing.type: Easing.OutCubic }
     }
 
-    // Drop shadow under the capsule
+    // Drop shadow under the capsule — multi-layer for depth
+    Rectangle {
+      anchors.fill: parent
+      anchors.margins: -4
+      radius: parent.height / 2 + 2
+      color: "transparent"
+      visible: root.glassEffect
+      border.color: Qt.alpha("#000000", Style.shadowOpacity * 0.10)
+      border.width: 3
+      z: -2
+    }
     Rectangle {
       anchors.fill: parent
       anchors.margins: -2
       radius: parent.height / 2
       color: "transparent"
       visible: root.glassEffect
-      border.color: Qt.alpha("#000000", Style.shadowOpacity * 0.18)
+      border.color: Qt.alpha("#000000", Style.shadowOpacity * 0.22)
       border.width: 2
       z: -2
     }
@@ -322,7 +334,7 @@ Item {
       radius: parent.height / 2
       color: "transparent"
       visible: root.glassEffect
-      border.color: Qt.alpha("#000000", Style.shadowOpacity * 0.30)
+      border.color: Qt.alpha("#000000", Style.shadowOpacity * 0.36)
       border.width: 1
       z: -2
     }
@@ -332,17 +344,32 @@ Item {
       id: visualCapsule
       anchors.fill: parent
       radius: Style.radiusL
-      // Slightly lighter when hovered for affordance
       color: mouseArea.containsMouse
         ? Color.mHover
-        : (root.glassEffect ? Qt.alpha(Style.capsuleColor, Style.opacityHeavy) : Style.capsuleColor)
-      border.color: Style.capsuleBorderColor
+        : (root.glassEffect ? Qt.alpha(Style.capsuleColor, 0.78) : Style.capsuleColor)
+      border.color: mouseArea.containsMouse
+        ? Qt.alpha(root.dynamicAccentColor, 0.65)
+        : Style.capsuleBorderColor
       border.width: Style.capsuleBorderWidth
       clip: true
 
       Behavior on color { ColorAnimation { duration: Style.animationFast } }
+      Behavior on border.color { ColorAnimation { duration: Style.animationFast } }
 
-      // Glass top-edge highlight: gradient from light at top, fading down
+      // Idle breathing — when nothing active, the capsule gently breathes
+      readonly property bool isIdle:
+          !root.mediaActive && !root.notifActive && !root.recordingActive
+       && !root.pomodoroActive && !root.batteryShouldShow
+       && !(root.barShowPrivacy && (root.micInUse || root.camInUse))
+
+      SequentialAnimation on opacity {
+        running: visualCapsule.isIdle && root.glassEffect
+        loops: Animation.Infinite
+        NumberAnimation { to: 0.88; duration: 2400; easing.type: Easing.InOutSine }
+        NumberAnimation { to: 1.0;  duration: 2400; easing.type: Easing.InOutSine }
+      }
+
+      // Glass top-edge highlight — stronger sheen
       Rectangle {
         anchors {
           left: parent.left
@@ -350,16 +377,34 @@ Item {
           top: parent.top
           margins: 1
         }
-        height: parent.height / 2
+        height: parent.height * 0.60
         radius: parent.radius
         visible: root.glassEffect
         gradient: Gradient {
-          GradientStop { position: 0.0; color: Qt.alpha("#ffffff", 0.16) }
-          GradientStop { position: 1.0; color: Qt.alpha("#ffffff", 0.0) }
+          GradientStop { position: 0.0;  color: Qt.alpha("#ffffff", 0.22) }
+          GradientStop { position: 0.55; color: Qt.alpha("#ffffff", 0.05) }
+          GradientStop { position: 1.0;  color: Qt.alpha("#ffffff", 0.0) }
         }
       }
 
-      // Dynamic accent line at the very bottom (1px) - a subtle activity indicator
+      // Bottom inner shadow — gives depth
+      Rectangle {
+        anchors {
+          left: parent.left
+          right: parent.right
+          bottom: parent.bottom
+          margins: 1
+        }
+        height: parent.height * 0.35
+        radius: parent.radius
+        visible: root.glassEffect
+        gradient: Gradient {
+          GradientStop { position: 0.0; color: Qt.alpha("#000000", 0.0) }
+          GradientStop { position: 1.0; color: Qt.alpha("#000000", 0.18) }
+        }
+      }
+
+      // Dynamic accent line at the very bottom — progress when applicable
       Rectangle {
         anchors {
           left: parent.left
@@ -368,11 +413,35 @@ Item {
           leftMargin: parent.radius
           rightMargin: parent.radius
         }
-        height: 1
-        opacity: 0.55
-        color: root.dynamicAccentColor
+        height: 2
+        opacity: 0.6
+        color: Qt.alpha(Color.mOutline, 0.4)
         visible: root.dynamicAccent
-        Behavior on color { ColorAnimation { duration: Style.animationNormal } }
+
+        // Progress overlay: shown for media (position), pomodoro (countdown),
+        // recording (elapsed seconds modulo 60 for an animated sweep).
+        Rectangle {
+          anchors.left: parent.left
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          color: root.dynamicAccentColor
+          opacity: 0.85
+
+          readonly property real progressFrac: {
+            if (root.mediaActive && MediaService.trackLength > 0) {
+              return Math.max(0, Math.min(1, MediaService.currentPosition / MediaService.trackLength))
+            }
+            if (root.pomodoroActive && root.pomodoroRemainingSec > 0) {
+              // pomodoroRemainingSec / total, but bar widget doesn't know total;
+              // use the work-min default proportionally.
+              return 0   // bar widget doesn't have access to pomodoro total, skip
+            }
+            return 0
+          }
+
+          width: parent.width * progressFrac
+          Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.Linear } }
+        }
       }
     }
 

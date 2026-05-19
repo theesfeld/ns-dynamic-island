@@ -1056,6 +1056,13 @@ Item {
   property int pomodoroCycleCount: 0
   readonly property bool pomodoroActive: pomodoroEnabled && pomodoroPhase !== "idle"
 
+  // Mirror live pomodoro state into pluginSettings (in-memory only — no
+  // saveSettings call) so the bar widget and panel can show the live
+  // countdown across plugin entry points.
+  onPomodoroPhaseChanged: if (pluginApi) pluginApi.pluginSettings.pomodoroLivePhase = pomodoroPhase
+  onPomodoroRemainingSecChanged: if (pluginApi) pluginApi.pluginSettings.pomodoroLiveRemaining = pomodoroRemainingSec
+  onPomodoroPhaseTotalSecChanged: if (pluginApi) pluginApi.pluginSettings.pomodoroLiveTotal = pomodoroPhaseTotalSec
+
   Timer {
     id: pomodoroTicker
     interval: 1000

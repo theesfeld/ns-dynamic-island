@@ -371,37 +371,77 @@ Item {
               Layout.fillWidth: true
               spacing: Style.marginM
 
-              Rectangle {
-                width: 64 * Style.uiScaleRatio
-                height: 64 * Style.uiScaleRatio
-                radius: 10
-                color: Color.mSurfaceVariant
-                clip: true
+              Item {
+                width: 80 * Style.uiScaleRatio
+                height: 80 * Style.uiScaleRatio
 
-                Image {
-                  anchors.fill: parent
-                  source: MediaService.trackArtUrl
-                  fillMode: Image.PreserveAspectCrop
-                  visible: MediaService.trackArtUrl.length > 0 && status === Image.Ready
-                  asynchronous: true; cache: true
-                  sourceSize.width: width * 2
-                  sourceSize.height: height * 2
-                }
-                NIcon {
-                  anchors.centerIn: parent
-                  icon: "music"
-                  color: Color.mPrimary
-                  visible: MediaService.trackArtUrl.length === 0
-                  applyUiScale: true
-                }
-
-                // Subtle accent ring
+                // Drop shadow layers (no real blur — layered translucent borders)
                 Rectangle {
                   anchors.fill: parent
-                  radius: parent.radius
+                  anchors.margins: -3
+                  radius: 14
                   color: "transparent"
-                  border.color: Qt.alpha(Color.mPrimary, 0.45)
+                  border.color: Qt.alpha("#000000", 0.10)
+                  border.width: 3
+                  z: -1
+                }
+                Rectangle {
+                  anchors.fill: parent
+                  anchors.margins: -1
+                  radius: 12
+                  color: "transparent"
+                  border.color: Qt.alpha("#000000", 0.28)
                   border.width: 1
+                  z: -1
+                }
+
+                Rectangle {
+                  anchors.fill: parent
+                  radius: 12
+                  color: Color.mSurfaceVariant
+                  clip: true
+
+                  Image {
+                    anchors.fill: parent
+                    source: MediaService.trackArtUrl
+                    fillMode: Image.PreserveAspectCrop
+                    visible: MediaService.trackArtUrl.length > 0 && status === Image.Ready
+                    asynchronous: true; cache: true
+                    sourceSize.width: width * 2
+                    sourceSize.height: height * 2
+                  }
+                  NIcon {
+                    anchors.centerIn: parent
+                    icon: "music"
+                    color: Color.mPrimary
+                    visible: MediaService.trackArtUrl.length === 0
+                    applyUiScale: true
+                  }
+
+                  // Top highlight on the art
+                  Rectangle {
+                    anchors {
+                      left: parent.left
+                      right: parent.right
+                      top: parent.top
+                      margins: 1
+                    }
+                    height: parent.height * 0.4
+                    radius: parent.radius
+                    gradient: Gradient {
+                      GradientStop { position: 0.0; color: Qt.alpha("#ffffff", 0.18) }
+                      GradientStop { position: 1.0; color: Qt.alpha("#ffffff", 0.0) }
+                    }
+                  }
+
+                  // Accent ring
+                  Rectangle {
+                    anchors.fill: parent
+                    radius: parent.radius
+                    color: "transparent"
+                    border.color: Qt.alpha(Color.mPrimary, 0.6)
+                    border.width: 1
+                  }
                 }
               }
 
@@ -582,6 +622,56 @@ Item {
               font.family: "monospace"
               Layout.preferredWidth: 36
             }
+          }
+
+          NDivider { Layout.fillWidth: true }
+
+          // ── Pomodoro controls ──────────────────────
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: Style.marginS
+
+            NIcon {
+              icon: "timer"
+              color: Color.mTertiary
+              applyUiScale: true
+            }
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: 0
+              NText {
+                text: "Focus timer"
+                color: Color.mOnSurface
+                pointSize: Style.fontSizeM
+                font.weight: Font.Medium
+              }
+              NText {
+                text: (root.cfg.pomodoroWorkMin ?? 25) + " min focus · "
+                  + (root.cfg.pomodoroShortBreakMin ?? 5) + " min break"
+                color: Color.mOnSurfaceVariant
+                pointSize: Style.fontSizeXS
+              }
+            }
+            NIconButton {
+              icon: "media-play"
+              onClicked: Quickshell.execDetached(["sh", "-c",
+                "qs ipc call plugin:ns-dynamic-island pomodoroStart 2>/dev/null || true"])
+            }
+            NIconButton {
+              icon: "media-pause"
+              onClicked: Quickshell.execDetached(["sh", "-c",
+                "qs ipc call plugin:ns-dynamic-island pomodoroPause 2>/dev/null || true"])
+            }
+            NIconButton {
+              icon: "close"
+              onClicked: Quickshell.execDetached(["sh", "-c",
+                "qs ipc call plugin:ns-dynamic-island pomodoroStop 2>/dev/null || true"])
+            }
+          }
+
+          NDivider {
+            Layout.fillWidth: true
+            visible: root.batteryLevel >= 0
           }
 
           // ── Battery row ────────────────────────────

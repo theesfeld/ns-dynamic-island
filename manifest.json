@@ -1,7 +1,7 @@
 {
   "id": "ns-dynamic-island",
   "name": "Dynamic Island",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "minNoctaliaVersion": "4.6.6",
   "author": "William Theesfeld",
   "license": "MIT",
@@ -184,6 +184,9 @@
       "ramEnabled": false,
       "ramWarnThreshold": 85,
 
+      "pomodoroLivePhase": "idle",
+      "pomodoroLiveRemaining": 0,
+      "pomodoroLiveTotal": 0,
       "pomodoroStatsEnabled": true,
       "pomodoroStatsDate": "",
       "pomodoroTodayCycles": 0,
