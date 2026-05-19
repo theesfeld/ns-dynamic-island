@@ -46,7 +46,7 @@ Item {
 
       NIcon {
         anchors.centerIn: parent
-        icon: root.isBreak ? "coffee" : "timer"
+        icon: root.isBreak ? "coffee" : "clock"
         pointSize: Style.fontSizeS
         color: root.accent
       }

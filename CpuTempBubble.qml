@@ -38,7 +38,7 @@ Item {
 
       NIcon {
         anchors.centerIn: parent
-        icon: root.hot ? "thermometer" : "cpu"
+        icon: root.hot ? "cpu" : "cpu"
         pointSize: Style.fontSizeS
         color: root.hot ? Color.mError : Color.mTertiary
       }

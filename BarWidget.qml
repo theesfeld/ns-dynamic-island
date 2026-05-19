@@ -7,6 +7,7 @@ import qs.Commons
 import qs.Modules.Bar.Extras
 import qs.Services.Compositor
 import qs.Services.Media
+import qs.Services.System
 import qs.Services.UI
 import qs.Widgets
 
@@ -253,12 +254,15 @@ Item {
   }
 
   function batteryIcon() {
+    // Tabler icon font uses "battery" (full) and battery-1..battery-4 for levels,
+    // plus battery-charging and battery-off.
     if (batteryState === "Charging") return "battery-charging"
-    if (batteryLevel >= 90) return "battery-full"
-    if (batteryLevel >= 60) return "battery-high"
-    if (batteryLevel >= 30) return "battery-medium"
-    if (batteryLevel >= 10) return "battery-low"
-    return "battery-empty"
+    if (batteryLevel >= 80) return "battery"
+    if (batteryLevel >= 60) return "battery-4"
+    if (batteryLevel >= 40) return "battery-3"
+    if (batteryLevel >= 20) return "battery-2"
+    if (batteryLevel > 0)   return "battery-1"
+    return "battery-off"
   }
 
   function mmss(s) {
@@ -267,7 +271,7 @@ Item {
   }
 
   function pomodoroIcon() {
-    return pomodoroPhase === "work" ? "timer" : "coffee"
+    return pomodoroPhase === "work" ? "clock" : "coffee"
   }
 
   readonly property bool batteryShouldShow:
@@ -505,7 +509,7 @@ Item {
         visible: root.barShowActiveWindow && root.activeWindowTitle.length > 0
 
         NIcon {
-          icon: "window"
+          icon: "app-window"
           color: Color.mOnSurfaceVariant
           applyUiScale: true
         }
@@ -655,7 +659,7 @@ Item {
         visible: root.notifActive
 
         NIcon {
-          icon: root.notifUrgency === 2 ? "alert" : "bell"
+          icon: root.notifUrgency === 2 ? "alert-circle" : "bell"
           color: root.notifUrgency === 2 ? Color.mError : Color.mTertiary
           applyUiScale: true
         }

@@ -74,7 +74,7 @@ Item {
 
         NIcon {
           anchors.centerIn: parent
-          icon: root.urgency === 2 ? "alert" : "bell"
+          icon: root.urgency === 2 ? "alert-circle" : "bell"
           pointSize: Style.fontSizeS
           color: root.accent
           visible: !root.notif || !root.notif.image || root.notif.image.length === 0

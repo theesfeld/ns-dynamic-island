@@ -21,11 +21,11 @@ Item {
 
   function batteryIcon(lvl, ch) {
     if (ch) return "battery-charging"
-    if (lvl >= 90) return "battery-full"
-    if (lvl >= 60) return "battery-high"
-    if (lvl >= 30) return "battery-medium"
-    if (lvl >= 10) return "battery-low"
-    return "battery-empty"
+    if (lvl >= 90) return "battery"
+    if (lvl >= 60) return "battery-4"
+    if (lvl >= 30) return "battery-3"
+    if (lvl >= 10) return "battery-2"
+    return "battery-off"
   }
 
   RowLayout {

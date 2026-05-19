@@ -17,14 +17,14 @@ Item {
 
   function iconName() {
     if (kind === "brightness") {
-      if (value >= 66) return "brightness-high"
-      if (value >= 33) return "brightness-medium"
-      return "brightness-low"
+      if (value >= 66) return "brightness-up"
+      if (value >= 33) return "brightness-up"
+      return "brightness-up"
     }
     if (muted) return "volume-mute"
-    if (value <= 0) return "volume-off"
-    if (value < 34) return "volume-low"
-    if (value < 67) return "volume-medium"
+    if (value <= 0) return "volume-mute"
+    if (value < 34) return "volume-2"
+    if (value < 67) return "volume-2"
     return "volume-high"
   }
 

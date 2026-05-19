@@ -37,7 +37,7 @@ Item {
       }
       NIcon {
         anchors.centerIn: parent
-        icon: "timer"
+        icon: "clock"
         pointSize: Style.fontSizeS
         color: Color.mTertiary
       }

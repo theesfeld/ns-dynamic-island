@@ -6,6 +6,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Services.Compositor
 import qs.Services.Media
+import qs.Services.System
 import qs.Services.UI
 import qs.Widgets
 
@@ -182,19 +183,19 @@ Item {
 
   function batteryIcon() {
     if (batteryState === "Charging") return "battery-charging"
-    if (batteryLevel >= 90) return "battery-full"
-    if (batteryLevel >= 60) return "battery-high"
-    if (batteryLevel >= 30) return "battery-medium"
-    if (batteryLevel >= 10) return "battery-low"
-    return "battery-empty"
+    if (batteryLevel >= 80) return "battery"
+    if (batteryLevel >= 60) return "battery-4"
+    if (batteryLevel >= 40) return "battery-3"
+    if (batteryLevel >= 20) return "battery-2"
+    if (batteryLevel > 0)   return "battery-1"
+    return "battery-off"
   }
 
   function volumeIcon() {
     if (volumeMuted) return "volume-mute"
-    if (volumePct >= 67) return "volume-high"
-    if (volumePct >= 34) return "volume-medium"
-    if (volumePct > 0)   return "volume-low"
-    return "volume-off"
+    if (volumePct >= 50) return "volume-high"
+    if (volumePct > 0)   return "volume-2"
+    return "volume-mute"
   }
 
   Rectangle {
@@ -335,7 +336,7 @@ Item {
             visible: root.activeWindowTitle.length > 0
             spacing: Style.marginS
 
-            NIcon { icon: "window"; color: Color.mOnSurfaceVariant; applyUiScale: true }
+            NIcon { icon: "app-window"; color: Color.mOnSurfaceVariant; applyUiScale: true }
             ColumnLayout {
               Layout.fillWidth: true
               spacing: 0
@@ -632,7 +633,7 @@ Item {
             spacing: Style.marginS
 
             NIcon {
-              icon: "timer"
+              icon: "clock"
               color: Color.mTertiary
               applyUiScale: true
             }
@@ -799,7 +800,7 @@ Item {
               }
             }
             NIconButton {
-              icon: "timer"
+              icon: "clock"
               Layout.fillWidth: true
               onClicked: Quickshell.execDetached(["sh", "-c",
                 "qs ipc call plugin:ns-dynamic-island pomodoroToggle 2>/dev/null || true"])

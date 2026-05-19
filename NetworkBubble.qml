@@ -15,13 +15,13 @@ Item {
 
   function netIcon() {
     if (state === "wifi") {
-      if (signal >= 75) return "wifi-high"
-      if (signal >= 50) return "wifi-medium"
-      if (signal >= 25) return "wifi-low"
+      if (signal >= 75) return "wifi"
+      if (signal >= 50) return "wifi-2"
+      if (signal >= 25) return "wifi-1"
       return "wifi-off"
     }
-    if (state === "ethernet") return "network-wired"
-    if (state === "disconnected") return "network-off"
+    if (state === "ethernet") return "ethernet"
+    if (state === "disconnected") return "wifi-off"
     return "network"
   }
 
